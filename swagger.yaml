@@ -1,0 +1,236 @@
+
+openapi: 3.0.0
+info:
+  title: Presensi API
+  description: API for employee attendance management
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api/v1/
+
+paths:
+  /presensi/hari-ini/{id_pegawai}:
+    get:
+      summary: Get today's attendance for a specific employee
+      parameters:
+        - name: id_pegawai
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Attendance found
+        '404':
+          description: No attendance for today
+        '500':
+          description: Server error
+
+  /presensi/{id_presensi}:
+    get:
+      summary: Get details of a specific attendance record
+      parameters:
+        - name: id_presensi
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Attendance detail found
+        '404':
+          description: Attendance not found
+        '500':
+          description: Server error
+
+  /presensi/list:
+    get:
+      summary: Get a list of attendance records
+      parameters:
+        - name: bulan
+          in: query
+          schema:
+            type: string
+        - name: tahun
+          in: query
+          schema:
+            type: string
+        - name: today
+          in: query
+          schema:
+            type: boolean
+        - name: id_opd
+          in: query
+          schema:
+            type: integer
+        - name: id_pegawai
+          in: query
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+        - name: order
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of attendance records
+        '500':
+          description: Server error
+
+  /presensi:
+    post:
+      summary: Create a new attendance record
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                id_pegawai:
+                  type: integer
+                ket_masuk:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Created
+        '403':
+          description: Already created or file missing
+        '500':
+          description: Server error
+
+  /presensi/siang/{id_presensi}:
+    put:
+      summary: Update siang (midday) attendance
+      parameters:
+        - name: id_presensi
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                id_pegawai:
+                  type: integer
+                ket_siang:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Updated successfully
+        '403':
+          description: Missing file
+        '404':
+          description: Data not found
+        '500':
+          description: Server error
+
+  /presensi/pulang/{id_presensi}:
+    put:
+      summary: Update pulang (end of day) attendance
+      parameters:
+        - name: id_presensi
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                id_pegawai:
+                  type: integer
+                ket_pulang:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Updated successfully
+        '403':
+          description: Missing file
+        '404':
+          description: Data not found
+        '500':
+          description: Server error
+
+  /presensi/edit/{id_presensi}:
+    put:
+      summary: Edit a specific attendance record
+      parameters:
+        - name: id_presensi
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                id_pegawai:
+                  type: integer
+                jam_masuk:
+                  type: string
+                ket_masuk:
+                  type: string
+                jam_pulang:
+                  type: string
+                edited_by:
+                  type: integer
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Updated successfully
+        '400':
+          description: File rename failed
+        '404':
+          description: Record not found
+        '500':
+          description: Server error
+
+  /presensi/delete/{id_presensi}:
+    delete:
+      summary: Delete a specific attendance record
+      parameters:
+        - name: id_presensi
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Deleted successfully
+        '404':
+          description: Not found
+        '500':
+          description: Server error

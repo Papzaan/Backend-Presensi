@@ -1,0 +1,213 @@
+openapi: 3.0.3
+info:
+  title: Presensi API
+  description: API untuk manajemen presensi pegawai
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/api/v1/
+
+paths:
+  /presensi/hari-ini/{id_pegawai}:
+    get:
+      summary: Ambil presensi hari ini
+      parameters:
+        - in: path
+          name: id_pegawai
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Berhasil ambil data
+        '404':
+          description: Tidak ada presensi hari ini
+
+  /presensi/detail/{id_presensi}:
+    get:
+      summary: Ambil detail presensi
+      parameters:
+        - in: path
+          name: id_presensi
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Berhasil ambil data
+        '404':
+          description: Data tidak ditemukan
+
+  /presensi:
+    get:
+      summary: List semua presensi
+      parameters:
+        - in: query
+          name: bulan
+          schema:
+            type: string
+        - in: query
+          name: tahun
+          schema:
+            type: string
+        - in: query
+          name: today
+          schema:
+            type: boolean
+        - in: query
+          name: id_opd
+          schema:
+            type: integer
+        - in: query
+          name: id_pegawai
+          schema:
+            type: integer
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: sort_by
+          schema:
+            type: string
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [ASC, DESC]
+      responses:
+        '200':
+          description: Berhasil ambil data list
+
+  /presensi:
+    post:
+      summary: Buat presensi pagi
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                id_pegawai:
+                  type: integer
+                ket_masuk:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Presensi pagi berhasil dibuat
+        '403':
+          description: Sudah mengisi hari ini atau foto kosong
+
+  /presensi/siang/{id_presensi}:
+    put:
+      summary: Update presensi siang
+      parameters:
+        - in: path
+          name: id_presensi
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                ket_siang:
+                  type: string
+                id_pegawai:
+                  type: integer
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Presensi siang berhasil
+        '404':
+          description: Data tidak ditemukan
+
+  /presensi/pulang/{id_presensi}:
+    put:
+      summary: Update presensi pulang
+      parameters:
+        - in: path
+          name: id_presensi
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                ket_pulang:
+                  type: string
+                id_pegawai:
+                  type: integer
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Presensi pulang berhasil
+        '404':
+          description: Data tidak ditemukan
+
+  /presensi/{id_presensi}:
+    put:
+      summary: Edit presensi pagi & pulang
+      parameters:
+        - in: path
+          name: id_presensi
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                id_pegawai:
+                  type: integer
+                jam_masuk:
+                  type: string
+                ket_masuk:
+                  type: string
+                jam_pulang:
+                  type: string
+                edited_by:
+                  type: integer
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Data presensi berhasil diedit
+
+  /presensi/{id_presensi}:
+    delete:
+      summary: Hapus presensi
+      parameters:
+        - in: path
+          name: id_presensi
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Presensi berhasil dihapus
+        '404':
+          description: Presensi tidak ditemukan

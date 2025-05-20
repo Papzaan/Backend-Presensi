@@ -1,0 +1,390 @@
+/* styles.css */
+
+/* Basic reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    line-height: 1.6;
+    background-color: #f4f4f4;
+    color: #333;
+    margin: 0;
+    overflow-x: hidden;
+}
+/* styles.css */
+
+/* Header styles */
+header {
+    display: flex;
+    justify-content: space-between; /* Position logo on the left and menu on the right */
+    align-items: center; /* Align items vertically */
+    padding: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Optional: add a subtle shadow for depth */
+}
+
+header .logo img {
+    height: 50px; /* Adjust height of the logo */
+    width: auto;
+    margin-right: 20px;
+}
+
+nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    display: flex; /* Use flexbox to align the menu items horizontally */
+}
+
+nav ul li {
+    margin-left: 20px; /* Space between menu items */
+}
+
+nav ul li a {
+    color: #333;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+nav ul li a:hover {
+    color: #4caf50; /* Add hover effect */
+}
+
+
+/* Hamburger Icon Styles */
+.hamburger {
+    display: none; /* Hidden by default */
+    font-size: 2rem;
+    color: white;
+    cursor: pointer;
+    z-index: 999; /* Ensure it is above other elements */
+}
+
+.hamburger:hover {
+    color: #4caf50;
+}
+
+
+/* Hero Section with Parallax Effect */
+.hero {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.7), rgba(30, 126, 52, 0.7)), url('/images/land.jpg') no-repeat center center/cover;
+    color: white;
+    padding: 120px 20px;
+    text-align: center;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background-attachment: fixed;
+    background-size: cover;
+    animation: fadeIn 2s ease-out;
+}
+
+.hero-title {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+}
+
+.hero p {
+    font-size: 1.5rem;
+    margin-top: 10px;
+}
+
+.hero button {
+    background-color: #4caf50;
+    color: #fff;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-top: 30px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+}
+
+.hero button:hover {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+
+/* Modal Styles */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 1000; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.7); /* Black with opacity */
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 15% auto;
+    padding: 20px;
+    width: 80%;
+    max-width: 500px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    animation: slideInUp 0.5s ease-out;
+}
+
+.close-btn {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Features Section */
+.features {
+    background-color: #fff;
+    padding: 50px 20px;
+    text-align: center;
+    animation: slideInUp 1.5s ease-out;
+}
+
+.features h2 {
+    font-size: 2.5rem;
+    margin-bottom: 30px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #333;
+}
+
+.feature-cards {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.card {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 20px;
+    width: 300px;
+    text-align: center;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+    background: linear-gradient(135deg, #f9f9f9, #e4e4e4);
+}
+
+.card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.card img {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 20px;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+}
+
+.card img:hover {
+    transform: scale(1.1);
+}
+
+.card h3 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.card p {
+    font-size: 1rem;
+    color: #777;
+}
+
+/* About Section with Gradient Text */
+.about {
+    background-color: #f4f4f4;
+    padding: 50px 20px;
+    text-align: center;
+    animation: fadeIn 2s ease-out;
+}
+
+.about h2 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #4caf50, #1e7e34);
+    -webkit-background-clip: text;
+    color: transparent;
+    font-weight: 600;
+}
+
+.about button {
+    background-color: #4caf50;
+    color: #fff;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-top: 20px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.about button:hover {
+    background-color: #45a049;
+}
+
+/* Contact Section */
+.contact {
+    background-color: #fff;
+    padding: 50px 20px;
+    text-align: center;
+    animation: fadeIn 2s ease-out;
+}
+
+.contact h2 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+}
+
+.social-links {
+    margin-top: 20px;
+}
+
+.social-links a {
+    color: #333;
+    margin-right: 20px;
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.social-links a:hover {
+    color: #4caf50;
+}
+
+/* Footer styles */
+footer {
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    padding: 20px;
+}
+
+footer p {
+    font-size: 1rem;
+}
+
+/* Keyframe Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .hero h2 {
+        font-size: 2rem;
+    }
+
+    .hero p {
+        font-size: 1.2rem;
+    }
+
+    .feature-cards {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .card {
+        width: 80%;
+        margin-bottom: 20px;
+    }
+
+    .social-links a {
+        font-size: 1rem;
+    }
+    header {
+        justify-content: space-between; /* Maintain space between logo and menu */
+    }
+
+    nav ul {
+        display: none; /* Hide menu by default on mobile */
+        width: 100%;
+        flex-direction: column; /* Stack the menu items vertically */
+        position: absolute;
+        top: 60px; /* Position below the header */
+        left: 0;
+        background-color: #333;
+        padding: 10px;
+    }
+
+    nav ul li {
+        margin: 10px 0; /* Vertical spacing between menu items */
+        text-align: center; /* Center-align the text */
+    }
+
+    nav ul li a {
+        font-size: 1.5rem;
+    }
+
+    .hamburger {
+        display: block; /* Show the hamburger icon on mobile */
+    }
+
+    nav ul.active {
+        display: block; /* Show the menu when active class is added */
+    }
+}
+/* For very small screens (extra mobile sizes) */
+@media (max-width: 480px) {
+    header .logo h1 {
+        font-size: 1.5rem;
+    }
+}
