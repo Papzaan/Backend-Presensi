@@ -6,7 +6,7 @@ const {Op, QueryTypes} = require("sequelize");
 module.exports = {
     login: async (req, res) => {
         try {
-            const query = `SELECT level, id_pegawai, nip_pegawai, nama_pegawai, url_foto_pegawai, o.id_opd, id_atasan, nama_opd, first_time, password FROM pegawai JOIN elapkin.opd o on pegawai.id_opd = o.id_opd WHERE nip_pegawai='${req.body.nip_pegawai}'`
+            const query = `SELECT level, id_pegawai, nip_pegawai, nama_pegawai, url_foto_pegawai, o.id_opd, id_atasan, nama_opd, first_time, password FROM pegawai JOIN dash_pringsewukab.opd o on pegawai.id_opd = o.id_opd WHERE nip_pegawai='${req.body.nip_pegawai}'`
             const pegawai = await Pegawai.sequelize.query(query, {type: QueryTypes.SELECT})
             const token = jwt.sign({pegawai: pegawai[0]}, process.env.TOKEN_AUTH, {
                 expiresIn: "1h"
