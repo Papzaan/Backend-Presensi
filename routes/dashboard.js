@@ -20,6 +20,30 @@ router.get('/opd-list', async (req, res) => {
   }
 });
 
+
+// Route to get Izin list
+router.get('/izin-list', async (req, res) => {
+  try {
+    const izinListQuery = `
+      SELECT keterangan, jenis_izin, tanggal_izin, tanggal_selesai, verifikasi, bukti, izin.id_izin, 
+      pegawai.nama_pegawai AS users,
+      opd.nama_opd 
+      FROM izin 
+      JOIN pegawai ON izin.id_izin = pegawai.id_pegawai
+      JOIN opd ON izin.id_opd = opd.id_opd
+      ORDER BY id_izin ASC;
+    `;
+    const izinList = await sequelize.query(izinListQuery, {
+      type: QueryTypes.SELECT
+    });
+    res.json(izinList); // Sending response as JSON
+  } catch (err) {
+    console.error('Error fetching Izin list:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 // Route to fetch Pegawai list by OPD
 router.get('/pegawai-list', async (req, res) => {
   const { id_opd } = req.query;
