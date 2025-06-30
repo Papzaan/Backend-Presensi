@@ -249,6 +249,129 @@ router.get('/presensi', async (req, res) => {
   }
 });
 
+//rekap dashboard
+router.get('/rekap', async (req, res) => {
+  const { start_date, end_date, id_opd } = req.query;
+  const start = new Date(start_date);
+  const end = new Date(end_date);
+
+  const startEpoch = start.setHours(0, 0, 0, 0);
+  const endEpoch = end.setHours(23, 59, 59, 999);
+  const replacements = { startEpoch, endEpoch, id_opd };
+
+  try {
+    // Presensi
+    const presensiData = await sequelize.query(`
+      SELECT p.jam_masuk, p.ket_masuk, p.foto_masuk, b.id_pegawai, b.nama_pegawai, b.nip_pegawai, b.id_opd, c.nama_opd
+      FROM presensi p
+      JOIN pegawai b ON p.id_pegawai = b.id_pegawai
+      LEFT JOIN opd c ON b.id_opd = c.id_opd
+      WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
+        ${id_opd ? 'AND b.id_opd = :id_opd' : 'AND b.id_opd != 0'}
+    `, { type: QueryTypes.SELECT, replacements });
+
+    // Izin
+    const izinData = await sequelize.query(`
+      SELECT a.tanggal_izin, a.tanggal_selesai, a.id_pegawai, b.nama_pegawai, b.nip_pegawai, b.id_opd, c.nama_opd
+      FROM izin a
+      JOIN pegawai b ON a.id_pegawai = b.id_pegawai
+      LEFT JOIN opd c ON b.id_opd = c.id_opd
+      WHERE a.verifikasi = 1
+        ${id_opd ? 'AND b.id_opd = :id_opd' : 'AND b.id_opd != 0'}
+    `, { type: QueryTypes.SELECT, replacements });
+
+    // Pegawai
+    const pegawaiList = await sequelize.query(`
+      SELECT b.id_pegawai, b.nama_pegawai, b.nip_pegawai, b.id_opd, c.nama_opd
+      FROM pegawai b
+      LEFT JOIN opd c ON b.id_opd = c.id_opd
+      ${id_opd ? 'WHERE b.id_opd = :id_opd' : 'WHERE b.id_opd != 0'}
+    `, { type: QueryTypes.SELECT, replacements });
+
+    const rekap = {};
+    const detailPegawai = {};
+
+    // Inisialisasi
+    pegawaiList.forEach(({ nama_opd }) => {
+      const opd = nama_opd || 'Tidak Diketahui';
+      if (!rekap[opd]) {
+        rekap[opd] = {};
+        detailPegawai[opd] = { biasa: [], khusus: [], izin: [], tanpa_keterangan: [] };
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const key = d.toISOString().split('T')[0];
+          rekap[opd][key] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+        }
+      }
+    });
+
+    // Presensi
+    presensiData.forEach(p => {
+      const tanggal = new Date(p.jam_masuk).toISOString().split('T')[0];
+      const opd = p.nama_opd || 'Tidak Diketahui';
+      if (!rekap[opd]?.[tanggal]) return;
+
+      if ((p.ket_masuk || '').startsWith('Biasa')) {
+        rekap[opd][tanggal].biasa++;
+        detailPegawai[opd].biasa.push({ ...p, tanggal });
+      } else if ((p.ket_masuk || '').startsWith('Khusus')) {
+        rekap[opd][tanggal].khusus++;
+        detailPegawai[opd].khusus.push({ ...p, tanggal });
+      }
+    });
+
+    // Izin
+    izinData.forEach(i => {
+      const opd = i.nama_opd || 'Tidak Diketahui';
+      const izinStart = new Date(i.tanggal_izin);
+      const izinEnd = new Date(i.tanggal_selesai);
+
+      for (let d = new Date(izinStart); d <= izinEnd; d.setDate(d.getDate() + 1)) {
+        const key = d.toISOString().split('T')[0];
+        if (rekap[opd]?.[key]) {
+          rekap[opd][key].izin++;
+          detailPegawai[opd].izin.push({ ...i, tanggal: key });
+        }
+      }
+    });
+
+    // Tanpa Keterangan
+    Object.entries(rekap).forEach(([opd, tanggalMap]) => {
+      const totalPegawai = pegawaiList.filter(p => p.nama_opd === opd).length;
+      const hadirKeySet = new Set([
+        ...detailPegawai[opd].biasa,
+        ...detailPegawai[opd].khusus,
+        ...detailPegawai[opd].izin
+      ].map(p => `${p.tanggal}_${p.id_pegawai}`));
+
+      Object.entries(tanggalMap).forEach(([tanggal, count]) => {
+        const hadir = count.biasa + count.khusus + count.izin;
+        count.tanpa_keterangan = Math.max(totalPegawai - hadir, 0);
+
+        pegawaiList.forEach(p => {
+          const key = `${tanggal}_${p.id_pegawai}`;
+          if (p.nama_opd === opd && !hadirKeySet.has(key)) {
+            detailPegawai[opd].tanpa_keterangan.push({ ...p, tanggal });
+          }
+        });
+      });
+    });
+
+    res.json({
+      message: 'Berhasil rekap presensi',
+      code: 200,
+      data: rekap,
+      detail: detailPegawai
+    });
+  } catch (err) {
+    console.error('Rekap Presensi Error:', err);
+    res.status(500).json({ message: 'Terjadi kesalahan', code: 500, error: err.message });
+  }
+});
+
+
+
+
+
 // Route to get Presensi data with lateness calculation considering holidays, Ramadan, and weekends
 // router.get('/presensi', async (req, res) => {
 //   const { id_opd, id_pegawai, date, limit, search, page } = req.query;
