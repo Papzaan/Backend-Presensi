@@ -367,11 +367,6 @@ router.get('/rekap', async (req, res) => {
     res.status(500).json({ message: 'Terjadi kesalahan', code: 500, error: err.message });
   }
 });
-
-
-
-
-
 // Route to get Presensi data with lateness calculation considering holidays, Ramadan, and weekends
 // router.get('/presensi', async (req, res) => {
 //   const { id_opd, id_pegawai, date, limit, search, page } = req.query;
