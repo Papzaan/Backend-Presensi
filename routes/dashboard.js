@@ -249,6 +249,44 @@ router.get('/presensi', async (req, res) => {
   }
 });
 
+//Route to get Pangkat dan golongan
+router.get('/pangkat-list', async (req, res) => {
+  try {
+    const golonganListQuery = `
+      SELECT id_pangkat, nama_pangkat, golongan
+      FROM pangkat
+      ORDER BY nama_pangkat ASC;
+    `;
+    const golonganList = await sequelize.query(golonganListQuery, {
+      type: QueryTypes.SELECT
+    });
+    res.json(golonganList); // Send as JSON
+  } catch (err) {
+    console.error('Error fetching Pangkat list:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Route to get Jabatan list
+router.get('/jabatan-list', async (req, res) => {
+  try {
+    const jabatanListQuery = `
+      SELECT j.id_jabatan, j.nama_jabatan, j.id_opd, o.nama_opd
+      FROM jabatan j
+      JOIN opd o ON j.id_opd = o.id_opd
+      GROUP BY j.nama_jabatan ASC
+      ORDER BY j.nama_jabatan ASC;
+    `;
+    const jabatanList = await sequelize.query(jabatanListQuery, {
+      type: QueryTypes.SELECT
+    });
+    res.json(jabatanList); // Send as JSON
+  } catch (err) {
+    console.error('Error fetching Jabatan list:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 //rekap dashboard
 router.get('/rekap', async (req, res) => {
   const { start_date, end_date, id_opd } = req.query;
@@ -288,6 +326,7 @@ router.get('/rekap', async (req, res) => {
       ${id_opd ? 'WHERE b.id_opd = :id_opd' : 'WHERE b.id_opd != 0'}
     `, { type: QueryTypes.SELECT, replacements });
 
+    
     const rekap = {};
     const detailPegawai = {};
 
@@ -333,7 +372,7 @@ router.get('/rekap', async (req, res) => {
         }
       }
     });
-
+    
     // Tanpa Keterangan
     Object.entries(rekap).forEach(([opd, tanggalMap]) => {
       const totalPegawai = pegawaiList.filter(p => p.nama_opd === opd).length;
@@ -367,6 +406,7 @@ router.get('/rekap', async (req, res) => {
     res.status(500).json({ message: 'Terjadi kesalahan', code: 500, error: err.message });
   }
 });
+
 // Route to get Presensi data with lateness calculation considering holidays, Ramadan, and weekends
 // router.get('/presensi', async (req, res) => {
 //   const { id_opd, id_pegawai, date, limit, search, page } = req.query;
