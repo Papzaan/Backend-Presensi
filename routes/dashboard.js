@@ -1,29 +1,28 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { sequelize } = require('../models');
-const { QueryTypes } = require('sequelize');
-const moment = require('moment-timezone');
-const { generateDateList } = require('../utils/dateUtils');
+const { sequelize } = require("../models");
+const { QueryTypes } = require("sequelize");
+const moment = require("moment-timezone");
+const { generateDateList } = require("../utils/dateUtils");
 
 // Route to get OPD list
-router.get('/opd-list', async (req, res) => {
+router.get("/opd-list", async (req, res) => {
   try {
     const opdListQuery = `
       SELECT id_opd, nama_opd FROM opd ORDER BY nama_opd ASC;
     `;
     const opdList = await sequelize.query(opdListQuery, {
-      type: QueryTypes.SELECT
+      type: QueryTypes.SELECT,
     });
     res.json(opdList); // Sending response as JSON
   } catch (err) {
-    console.error('Error fetching OPD list:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching OPD list:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-
 // Route to get Izin list
-router.get('/izin-list', async (req, res) => {
+router.get("/izin-list", async (req, res) => {
   try {
     const izinListQuery = `
       SELECT keterangan, jenis_izin, tanggal_izin, tanggal_selesai, verifikasi, bukti, izin.id_izin, 
@@ -35,18 +34,17 @@ router.get('/izin-list', async (req, res) => {
       ORDER BY id_izin ASC;
     `;
     const izinList = await sequelize.query(izinListQuery, {
-      type: QueryTypes.SELECT
+      type: QueryTypes.SELECT,
     });
     res.json(izinList); // Sending response as JSON
   } catch (err) {
-    console.error('Error fetching Izin list:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching Izin list:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-
 // Route to fetch Pegawai list by OPD
-router.get('/pegawai-list', async (req, res) => {
+router.get("/pegawai-list", async (req, res) => {
   const { id_opd } = req.query;
 
   try {
@@ -60,28 +58,28 @@ router.get('/pegawai-list', async (req, res) => {
 
     const pegawaiList = await sequelize.query(pegawaiListQuery, {
       type: QueryTypes.SELECT,
-      replacements: { id_opd }
+      replacements: { id_opd },
     });
 
     // Ensure that the result is always an array
     res.json(Array.isArray(pegawaiList) ? pegawaiList : []);
   } catch (err) {
-    console.error('Error fetching Pegawai list:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching Pegawai list:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-router.get('/presensi', async (req, res) => {
+router.get("/presensi", async (req, res) => {
   const { id_opd, id_pegawai, date, limit, search, page } = req.query;
 
   const selectedDate = date ? new Date(date) : new Date();
-  const selectedDateFormatted = selectedDate.toISOString().split('T')[0]; // Ensure correct date format
+  const selectedDateFormatted = selectedDate.toISOString().split("T")[0]; // Ensure correct date format
 
-  console.log('Selected Date (formatted):', selectedDateFormatted); // Debugging the selected date
+  console.log("Selected Date (formatted):", selectedDateFormatted); // Debugging the selected date
 
   // Convert lateness threshold to GMT+7 time zone for any given date
   function convertToGMTPlus7(timeString, date) {
-    const threshold = moment.tz(timeString, 'HH:mm:ss', 'Asia/Jakarta');
+    const threshold = moment.tz(timeString, "HH:mm:ss", "Asia/Jakarta");
     threshold.set({
       year: date.getFullYear(),
       month: date.getMonth(),
@@ -99,21 +97,21 @@ router.get('/presensi', async (req, res) => {
   try {
     const holidays = await sequelize.query(holidayQuery, {
       type: QueryTypes.SELECT,
-      replacements: { selectedDate: selectedDateFormatted }
+      replacements: { selectedDate: selectedDateFormatted },
     });
 
-    let latenessThreshold = '07:31:00'; // Default lateness threshold for normal day
+    let latenessThreshold = "07:31:00"; // Default lateness threshold for normal day
     let holidayName = null;
     let isWeekend = false;
     let isHoliday = false;
     let isRamadan = false;
 
     // Check if the selected date is a weekend (Saturday or Sunday)
-    const dayOfWeek = selectedDate.getDay();  // 0 = Sunday, 6 = Saturday
+    const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 6 = Saturday
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       // If it's a weekend, do not calculate lateness
       isWeekend = true;
-      latenessThreshold = 'No lateness calculation for weekends';
+      latenessThreshold = "No lateness calculation for weekends";
     }
 
     // If it's a holiday, handle accordingly
@@ -123,19 +121,19 @@ router.get('/presensi', async (req, res) => {
 
       // If it's a holiday (type = 2), set threshold to normal (no lateness)
       if (holiday.type === 2) {
-        latenessThreshold = 'No lateness calculation for holidays';
+        latenessThreshold = "No lateness calculation for holidays";
         isHoliday = true;
       }
       // If it's Ramadan (type = 1), set threshold to 08:01:00
       else if (holiday.type === 1) {
-        latenessThreshold = '08:01:00';  // Ramadan lateness threshold
+        latenessThreshold = "08:01:00"; // Ramadan lateness threshold
         isRamadan = true;
       }
     }
 
     // Prepare the query to get the actual attendance data for the whole day
-    const startEpoch = new Date(selectedDate.setHours(0, 0, 0, 0)).getTime();  // 00:00:00 of the selected day
-    const endEpoch = new Date(selectedDate).setHours(23, 59, 59, 999);  // 23:59:59 of the selected day
+    const startEpoch = new Date(selectedDate.setHours(0, 0, 0, 0)).getTime(); // 00:00:00 of the selected day
+    const endEpoch = new Date(selectedDate).setHours(23, 59, 59, 999); // 23:59:59 of the selected day
 
     const baseWhere = [];
     const replacements = { startEpoch, endEpoch };
@@ -153,7 +151,9 @@ router.get('/presensi', async (req, res) => {
     }
 
     if (search) {
-      baseWhere.push(`(b.nip_pegawai LIKE :search OR b.nama_pegawai LIKE :search)`);
+      baseWhere.push(
+        `(b.nip_pegawai LIKE :search OR b.nama_pegawai LIKE :search)`
+      );
       replacements.search = `%${search}%`;
     }
 
@@ -161,13 +161,13 @@ router.get('/presensi', async (req, res) => {
       SELECT COUNT(*) AS totalRecords
       FROM presensi AS p
       JOIN pegawai AS b ON p.id_pegawai = b.id_pegawai
-      WHERE ${baseWhere.join(' AND ')}
+      WHERE ${baseWhere.join(" AND ")}
     `;
 
     // Get the total count of records
     const totalCountResult = await sequelize.query(totalCountQuery, {
       type: QueryTypes.SELECT,
-      replacements
+      replacements,
     });
     const totalRecords = totalCountResult[0].totalRecords;
     const totalPages = Math.ceil(totalRecords / limit);
@@ -183,38 +183,47 @@ router.get('/presensi', async (req, res) => {
       FROM presensi AS p
       JOIN pegawai AS b ON p.id_pegawai = b.id_pegawai
       LEFT JOIN opd AS c ON b.id_opd = c.id_opd
-      WHERE ${baseWhere.join(' AND ')}
+      WHERE ${baseWhere.join(" AND ")}
       ORDER BY p.jam_masuk ASC
       LIMIT :limit OFFSET :offset
     `;
 
     const updatedData = await sequelize.query(updatedQuery, {
       type: QueryTypes.SELECT,
-      replacements: { ...replacements, limit: limitNum, offset }
+      replacements: { ...replacements, limit: limitNum, offset },
     });
 
     let totalLateness = 0; // Counter for total lateness
-    let totalOntime = 0;  // Counter for total on-time
+    let totalOntime = 0; // Counter for total on-time
 
     // Process each record to determine lateness and holiday status
-    updatedData.forEach(record => {
+    updatedData.forEach((record) => {
       const jamMasukEpoch = record.jam_masuk;
       const jamMasuk = new Date(jamMasukEpoch); // Convert epoch to Date object
-      let lateness = 'On time';  // Default lateness status
+      let lateness = "On time"; // Default lateness status
 
       // Convert jam_masuk to GMT+7 (adjust time by +7 hours)
-      const jamMasukGMT7 = moment.utc(jamMasuk).tz('Asia/Jakarta').valueOf(); // Adjust to GMT+7
+      const jamMasukGMT7 = moment.utc(jamMasuk).tz("Asia/Jakarta").valueOf(); // Adjust to GMT+7
 
       // Convert lateness threshold to the same date as jam_masuk (on the same day as jam_masuk)
       const latenessTimeGMT7 = convertToGMTPlus7(latenessThreshold, jamMasuk);
 
       // If jam_masuk is later than the lateness threshold, calculate minutes late
-      if (!isWeekend && !isHoliday && !isRamadan && jamMasukGMT7 > latenessTimeGMT7) {
-        const latenessMinutes = Math.floor((jamMasukGMT7 - latenessTimeGMT7) / 60000); // Calculate lateness in minutes
+      if (
+        !isWeekend &&
+        !isHoliday &&
+        !isRamadan &&
+        jamMasukGMT7 > latenessTimeGMT7
+      ) {
+        const latenessMinutes = Math.floor(
+          (jamMasukGMT7 - latenessTimeGMT7) / 60000
+        ); // Calculate lateness in minutes
         lateness = `${latenessMinutes} menit`;
         totalLateness++; // Increment lateness counter
       } else if (isRamadan && jamMasukGMT7 > latenessTimeGMT7) {
-        const latenessMinutes = Math.floor((jamMasukGMT7 - latenessTimeGMT7) / 60000); // Calculate lateness in minutes
+        const latenessMinutes = Math.floor(
+          (jamMasukGMT7 - latenessTimeGMT7) / 60000
+        ); // Calculate lateness in minutes
         lateness = `${latenessMinutes} menit`;
         totalLateness++; // Increment lateness counter
       } else {
@@ -236,21 +245,20 @@ router.get('/presensi', async (req, res) => {
       totalRecords,
       totalPages,
       totalLateness, // Total lateness count
-      totalOntime,   // Total on-time count
-      data: updatedData
+      totalOntime, // Total on-time count
+      data: updatedData,
     });
-
   } catch (err) {
-    console.error('Error fetching presensi data:', err.message);
+    console.error("Error fetching presensi data:", err.message);
     res.status(500).json({
-      message: 'Error retrieving attendance data',
+      message: "Error retrieving attendance data",
       code: 500,
-      error: err.message
+      error: err.message,
     });
   }
 });
 
-router.get('/opd-list', async (req, res) => {
+router.get("/opd-list", async (req, res) => {
   try {
     const opdListQuery = `
       SELECT id_opd, nama_opd,
@@ -258,17 +266,17 @@ router.get('/opd-list', async (req, res) => {
       ORDER BY nama_opd ASC;
     `;
     const opdList = await sequelize.query(opdListQuery, {
-      type: QueryTypes.SELECT
+      type: QueryTypes.SELECT,
     });
     res.json(opdList); // Send as JSON
   } catch (err) {
-    console.error('Error fetching OPS list:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching OPS list:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
 //Route to get Pangkat dan golongan
-router.get('/pangkat-list', async (req, res) => {
+router.get("/pangkat-list", async (req, res) => {
   try {
     const golonganListQuery = `
       SELECT id_pangkat, nama_pangkat, golongan
@@ -276,17 +284,17 @@ router.get('/pangkat-list', async (req, res) => {
       ORDER BY nama_pangkat ASC;
     `;
     const golonganList = await sequelize.query(golonganListQuery, {
-      type: QueryTypes.SELECT
+      type: QueryTypes.SELECT,
     });
     res.json(golonganList); // Send as JSON
   } catch (err) {
-    console.error('Error fetching Pangkat list:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching Pangkat list:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
 // Route to get Jabatan list
-router.get('/jabatan-list', async (req, res) => {
+router.get("/jabatan-list", async (req, res) => {
   try {
     const jabatanListQuery = `
       SELECT j.id_jabatan, j.nama_jabatan, j.id_opd, o.nama_opd
@@ -296,108 +304,201 @@ router.get('/jabatan-list', async (req, res) => {
       ORDER BY j.nama_jabatan ASC;
     `;
     const jabatanList = await sequelize.query(jabatanListQuery, {
-      type: QueryTypes.SELECT
+      type: QueryTypes.SELECT,
     });
     res.json(jabatanList); // Send as JSON
   } catch (err) {
-    console.error('Error fetching Jabatan list:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching Jabatan list:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
 //rekap dashboard
 // REKAP UTAMA
-router.get('/rekap', async (req, res) => {
+router.get("/rekap", async (req, res) => {
   const { start_date, end_date, id_opd, id_jabatan, id_pangkat } = req.query;
   if (!start_date || !end_date) {
-    return res.status(400).json({ code: 400, message: 'start_date dan end_date wajib diisi' });
+    return res.status(400).json({
+      code: 400,
+      message: "start_date dan end_date wajib diisi",
+    });
   }
 
-  const start = new Date(start_date);
-  const end = new Date(end_date);
-  const startEpoch = start.setHours(0, 0, 0, 0);
-  const endEpoch = end.setHours(23, 59, 59, 999);
-  const replacements = { startEpoch, endEpoch, id_opd, id_jabatan, id_pangkat };
+  const startEpoch = new Date(start_date + 'T00:00:00Z').getTime();
+  const endEpoch = new Date(end_date + 'T23:59:59Z').getTime();
 
-  let filterOPD = id_opd ? 'AND b.id_opd = :id_opd' : '';
-  let filterJabatan = id_jabatan ? 'AND b.id_jabatan = :id_jabatan' : '';
-  let filterPangkat = id_pangkat ? 'AND b.id_pangkat = :id_pangkat' : '';
+  const replacements = {
+    startEpoch,
+    endEpoch,
+    id_opd,
+    id_jabatan,
+    id_pangkat,
+  };
+
+  const filterOPD = id_opd ? "AND b.id_opd = :id_opd" : "";
+  const filterJabatan = id_jabatan ? "AND b.id_jabatan = :id_jabatan" : "";
+  const filterPangkat = id_pangkat ? "AND b.id_pangkat = :id_pangkat" : "";
 
   try {
-    const presensi = await sequelize.query(`
+    // Ambil daftar hari libur
+    const libur = await sequelize.query(
+      `
+      SELECT date_start, date_end FROM hari_libur
+      WHERE (date_start BETWEEN :start_date AND :end_date)
+         OR (date_end BETWEEN :start_date AND :end_date)
+         OR (:start_date BETWEEN date_start AND date_end)
+         OR (:end_date BETWEEN date_start AND date_end)
+    `,
+      {
+        type: QueryTypes.SELECT,
+        replacements: {
+          start_date,
+          end_date
+        },
+      }
+    );
+
+    // Siapkan set tanggal libur
+    const hariLiburSet = new Set();
+libur.forEach(l => {
+  let curr = new Date(l.date_start);
+  const end = new Date(l.date_end);
+
+  while (curr <= end) {
+    const tgl = curr.toISOString().split("T")[0];
+    hariLiburSet.add(tgl);
+
+    // Hati-hati! Buat objek baru agar curr tidak corrupt
+    curr = new Date(curr.getTime() + 86400000); // +1 hari
+  }
+});
+
+    // Generate hanya hari kerja
+    const tanggalSet = new Set();
+    let loopDate = new Date(start_date);
+    const loopEndDate = new Date(end_date);
+    while (loopDate <= loopEndDate) {
+      const day = loopDate.getDay();
+      const tglStr = loopDate.toISOString().split("T")[0];
+      if (day !== 0 && day !== 6 && !hariLiburSet.has(tglStr)) {
+        tanggalSet.add(tglStr);
+      }
+      loopDate.setDate(loopDate.getDate() + 1);
+    }
+
+    // PRESENSI
+    const presensi = await sequelize.query(
+      `
       SELECT p.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
       FROM presensi p
       JOIN pegawai b ON p.id_pegawai = b.id_pegawai
       LEFT JOIN opd c ON b.id_opd = c.id_opd
       WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
       ${filterOPD} ${filterJabatan} ${filterPangkat}
-    `, { type: QueryTypes.SELECT, replacements });
+    `,
+      { type: QueryTypes.SELECT, replacements }
+    );
 
-    const izin = await sequelize.query(`
+    // IZIN
+    const izin = await sequelize.query(
+      `
       SELECT a.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
       FROM izin a
       JOIN pegawai b ON a.id_pegawai = b.id_pegawai
       LEFT JOIN opd c ON b.id_opd = c.id_opd
       WHERE a.verifikasi = 1 AND a.tanggal_izin BETWEEN :startEpoch AND :endEpoch
       ${filterOPD} ${filterJabatan} ${filterPangkat}
-    `, { type: QueryTypes.SELECT, replacements });
+    `,
+      { type: QueryTypes.SELECT, replacements }
+    );
 
-    const pegawaiList = await sequelize.query(`
+    // PEGAWAI
+    const pegawaiList = await sequelize.query(
+      `
       SELECT b.id_pegawai, b.nama_pegawai, b.nip_pegawai, c.nama_opd
       FROM pegawai b
       LEFT JOIN opd c ON b.id_opd = c.id_opd
       WHERE 1=1 ${filterOPD} ${filterJabatan} ${filterPangkat}
-    `, { type: QueryTypes.SELECT, replacements });
+    `,
+      { type: QueryTypes.SELECT, replacements }
+    );
 
     const rekap = {};
     const detail = {};
 
-    pegawaiList.forEach(p => {
-      const opd = p.nama_opd || 'Tidak Diketahui';
+    pegawaiList.forEach((p) => {
+      const opd = p.nama_opd || "Tidak Diketahui";
       if (!rekap[opd]) {
         rekap[opd] = {};
-        detail[opd] = { biasa: [], khusus: [], izin: [], tanpa_keterangan: [] };
+        detail[opd] = {
+          biasa: [],
+          khusus: [],
+          izin: [],
+          tanpa_keterangan: [],
+        };
       }
     });
 
-    const tanggalSet = new Set();
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      tanggalSet.add(d.toISOString().split('T')[0]);
-    }
+    // PRESENSI
+    presensi.forEach((p) => {
+      const opd = p.nama_opd || "Tidak Diketahui";
+      const tanggal = new Date(p.jam_masuk).toISOString().split("T")[0];
+      if (!tanggalSet.has(tanggal)) return;
 
-    presensi.forEach(p => {
-      const opd = p.nama_opd || 'Tidak Diketahui';
-      const tanggal = new Date(p.jam_masuk).toISOString().split('T')[0];
       if (!rekap[opd][tanggal]) {
-        rekap[opd][tanggal] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+        rekap[opd][tanggal] = {
+          biasa: 0,
+          khusus: 0,
+          izin: 0,
+          tanpa_keterangan: 0,
+        };
       }
-      if ((p.ket_masuk || '').startsWith('Biasa')) {
+
+      if ((p.ket_masuk || "").startsWith("Biasa")) {
         rekap[opd][tanggal].biasa++;
         detail[opd].biasa.push({ ...p, tanggal });
-      } else if ((p.ket_masuk || '').startsWith('Khusus')) {
+      } else if ((p.ket_masuk || "").startsWith("Khusus")) {
         rekap[opd][tanggal].khusus++;
         detail[opd].khusus.push({ ...p, tanggal });
       }
     });
 
-    izin.forEach(i => {
-      const opd = i.nama_opd || 'Tidak Diketahui';
-      const tanggal = new Date(i.tanggal_izin).toISOString().split('T')[0];
+    // IZIN
+    izin.forEach((i) => {
+      const opd = i.nama_opd || "Tidak Diketahui";
+      const tanggal = new Date(i.tanggal_izin).toISOString().split("T")[0];
+      if (!tanggalSet.has(tanggal)) return;
+
       if (!rekap[opd][tanggal]) {
-        rekap[opd][tanggal] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+        rekap[opd][tanggal] = {
+          biasa: 0,
+          khusus: 0,
+          izin: 0,
+          tanpa_keterangan: 0,
+        };
       }
+
       rekap[opd][tanggal].izin++;
       detail[opd].izin.push({ ...i, tanggal });
     });
 
-    pegawaiList.forEach(p => {
-      const opd = p.nama_opd || 'Tidak Diketahui';
-      tanggalSet.forEach(tgl => {
+    // TANPA KETERANGAN
+    pegawaiList.forEach((p) => {
+      const opd = p.nama_opd || "Tidak Diketahui";
+      tanggalSet.forEach((tgl) => {
         if (!rekap[opd][tgl]) {
-          rekap[opd][tgl] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+          rekap[opd][tgl] = {
+            biasa: 0,
+            khusus: 0,
+            izin: 0,
+            tanpa_keterangan: 0,
+          };
         }
-        const hadir = detail[opd].biasa.concat(detail[opd].khusus, detail[opd].izin)
-          .some(d => d.id_pegawai === p.id_pegawai && d.tanggal === tgl);
+
+        const hadir = detail[opd].biasa
+          .concat(detail[opd].khusus, detail[opd].izin)
+          .some((d) => d.id_pegawai === p.id_pegawai && d.tanggal === tgl);
+
         if (!hadir) {
           rekap[opd][tgl].tanpa_keterangan++;
           detail[opd].tanpa_keterangan.push({ ...p, tanggal: tgl });
@@ -405,10 +506,30 @@ router.get('/rekap', async (req, res) => {
       });
     });
 
-    res.json({ code: 200, message: 'Berhasil rekap', data: rekap, detail });
+    // SORTING
+    Object.keys(rekap).forEach((opd) => {
+      const sorted = Object.keys(rekap[opd])
+        .sort()
+        .reduce((acc, key) => {
+          acc[key] = rekap[opd][key];
+          return acc;
+        }, {});
+      rekap[opd] = sorted;
+    });
+
+    return res.json({
+      code: 200,
+      message: "Berhasil rekap",
+      data: rekap,
+      detail,
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ code: 500, message: 'Error', error: err.message });
+    return res.status(500).json({
+      code: 500,
+      message: "Error",
+      error: err.message,
+    });
   }
 });
 
@@ -460,7 +581,7 @@ router.get('/rekap', async (req, res) => {
 //       else if (holiday.type === 2) {
 //         latenessThreshold = '08:30:00'; // Ramadan lateness threshold
 //       }
-//     } 
+//     }
 
 //     const baseWhere = [];
 //     const replacements = { startEpoch, endEpoch };
@@ -704,11 +825,13 @@ router.get('/rekap', async (req, res) => {
 //   }
 // });
 
-router.get('/rekap-tabel', async (req, res) => {
+router.get("/rekap-tabel", async (req, res) => {
   const { start_date, end_date, id_opd, id_jabatan, id_pangkat } = req.query;
 
   if (!start_date || !end_date) {
-    return res.status(400).json({ message: "Tanggal mulai dan akhir wajib diisi", code: 400 });
+    return res
+      .status(400)
+      .json({ message: "Tanggal mulai dan akhir wajib diisi", code: 400 });
   }
 
   const start = new Date(start_date);
@@ -717,30 +840,37 @@ router.get('/rekap-tabel', async (req, res) => {
 
   try {
     // 1. Hari libur
-    const libur = await sequelize.query(`
+    const libur = await sequelize.query(
+      `
       SELECT * FROM hari_libur
       WHERE DATE(date_start) <= :end_date AND (date_end IS NULL OR DATE(date_end) >= :start_date)
-    `, {
-      type: QueryTypes.SELECT,
-      replacements: { start_date, end_date }
-    });
+    `,
+      {
+        type: QueryTypes.SELECT,
+        replacements: { start_date, end_date },
+      }
+    );
 
     const hariLiburSet = new Set();
     for (const lib of libur) {
       const libStart = new Date(lib.date_start);
       const libEnd = lib.date_end ? new Date(lib.date_end) : libStart;
       const range = generateDateList(libStart, libEnd);
-      range.forEach(d => hariLiburSet.add(d));
+      range.forEach((d) => hariLiburSet.add(d));
     }
 
     // 2. Filter hanya tanggal kerja (bukan hari libur atau akhir pekan)
-    const tanggalKerja = datesInRange.filter(dateStr => {
+    const tanggalKerja = datesInRange.filter((dateStr) => {
       const day = new Date(dateStr).getDay();
       return !hariLiburSet.has(dateStr) && day !== 0 && day !== 6;
     });
 
     if (tanggalKerja.length === 0) {
-      return res.json({ message: "Tidak ada hari kerja di rentang ini", code: 200, data: [] });
+      return res.json({
+        message: "Tidak ada hari kerja di rentang ini",
+        code: 200,
+        data: [],
+      });
     }
 
     // 3. Query Pegawai
@@ -753,80 +883,86 @@ router.get('/rekap-tabel', async (req, res) => {
     const replacements = {};
 
     if (id_opd) {
-      pegawaiQuery += ' AND b.id_opd = :id_opd';
+      pegawaiQuery += " AND b.id_opd = :id_opd";
       replacements.id_opd = id_opd;
     }
     if (id_jabatan) {
-      pegawaiQuery += ' AND b.id_jabatan = :id_jabatan';
+      pegawaiQuery += " AND b.id_jabatan = :id_jabatan";
       replacements.id_jabatan = id_jabatan;
     }
     if (id_pangkat) {
-      pegawaiQuery += ' AND b.id_pangkat = :id_pangkat';
+      pegawaiQuery += " AND b.id_pangkat = :id_pangkat";
       replacements.id_pangkat = id_pangkat;
     }
 
     const pegawaiList = await sequelize.query(pegawaiQuery, {
       type: QueryTypes.SELECT,
-      replacements
+      replacements,
     });
 
     // 4. Query Presensi
     const startEpoch = new Date(start).setHours(0, 0, 0, 0);
     const endEpoch = new Date(end).setHours(23, 59, 59, 999);
 
-    const presensiData = await sequelize.query(`
+    const presensiData = await sequelize.query(
+      `
       SELECT p.ket_masuk, p.jam_masuk, b.id_pegawai, c.nama_opd 
       FROM presensi AS p
       JOIN pegawai AS b ON p.id_pegawai = b.id_pegawai
       LEFT JOIN opd AS c ON b.id_opd = c.id_opd
       WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
-      ${id_opd ? 'AND b.id_opd = :id_opd' : ''}
-    `, {
-      type: QueryTypes.SELECT,
-      replacements: { ...replacements, startEpoch, endEpoch }
-    });
+      ${id_opd ? "AND b.id_opd = :id_opd" : ""}
+    `,
+      {
+        type: QueryTypes.SELECT,
+        replacements: { ...replacements, startEpoch, endEpoch },
+      }
+    );
 
     // 5. Query Izin
-    const izinData = await sequelize.query(`
+    const izinData = await sequelize.query(
+      `
       SELECT a.id_pegawai, a.tanggal_izin, a.tanggal_selesai, c.nama_opd
       FROM izin AS a
       JOIN pegawai AS b ON a.id_pegawai = b.id_pegawai
       LEFT JOIN opd AS c ON b.id_opd = c.id_opd
       WHERE a.verifikasi = 1
-      ${id_opd ? 'AND b.id_opd = :id_opd' : ''}
-    `, {
-      type: QueryTypes.SELECT,
-      replacements
-    });
+      ${id_opd ? "AND b.id_opd = :id_opd" : ""}
+    `,
+      {
+        type: QueryTypes.SELECT,
+        replacements,
+      }
+    );
 
     // 6. Inisialisasi Struktur Data
     const hasil = {};
     const pegawaiMap = {};
-    pegawaiList.forEach(p => {
+    pegawaiList.forEach((p) => {
       pegawaiMap[p.id_pegawai] = p.nama_opd;
-      const opd = p.nama_opd || 'Tidak Diketahui';
+      const opd = p.nama_opd || "Tidak Diketahui";
       if (!hasil[opd]) {
         hasil[opd] = {
           nama_opd: opd,
           jumlah_pegawai: 0,
           per_tanggal: {},
-          pegawai: []
+          pegawai: [],
         };
       }
       hasil[opd].jumlah_pegawai++;
       hasil[opd].pegawai.push({
         id_pegawai: p.id_pegawai,
         nama_pegawai: p.nama_pegawai,
-        nip_pegawai: p.nip_pegawai
+        nip_pegawai: p.nip_pegawai,
       });
 
-      tanggalKerja.forEach(tgl => {
+      tanggalKerja.forEach((tgl) => {
         if (!hasil[opd].per_tanggal[tgl]) {
           hasil[opd].per_tanggal[tgl] = {
             biasa: 0,
             khusus: 0,
             izin: 0,
-            tanpa_keterangan: 0
+            tanpa_keterangan: 0,
           };
         }
       });
@@ -834,14 +970,14 @@ router.get('/rekap-tabel', async (req, res) => {
 
     // 7. Hitung presensi
     for (const presensi of presensiData) {
-      const dateKey = new Date(presensi.jam_masuk).toISOString().split('T')[0];
+      const dateKey = new Date(presensi.jam_masuk).toISOString().split("T")[0];
       const opd = presensi.nama_opd;
       if (!tanggalKerja.includes(dateKey)) continue;
       if (!hasil[opd]) continue;
 
-      if (presensi.ket_masuk.startsWith('Biasa')) {
+      if (presensi.ket_masuk.startsWith("Biasa")) {
         hasil[opd].per_tanggal[dateKey].biasa++;
-      } else if (presensi.ket_masuk.startsWith('Khusus')) {
+      } else if (presensi.ket_masuk.startsWith("Khusus")) {
         hasil[opd].per_tanggal[dateKey].khusus++;
       }
     }
@@ -854,7 +990,7 @@ router.get('/rekap-tabel', async (req, res) => {
       const startIzin = new Date(izin.tanggal_izin);
       const endIzin = new Date(izin.tanggal_selesai);
       const izinRange = generateDateList(startIzin, endIzin);
-      izinRange.forEach(tgl => {
+      izinRange.forEach((tgl) => {
         if (tanggalKerja.includes(tgl)) {
           hasil[opd].per_tanggal[tgl].izin++;
         }
@@ -865,10 +1001,14 @@ router.get('/rekap-tabel', async (req, res) => {
     for (const opd in hasil) {
       const total = hasil[opd].jumlah_pegawai;
       for (const tanggal of tanggalKerja) {
-        const hadir = hasil[opd].per_tanggal[tanggal].biasa +
-                      hasil[opd].per_tanggal[tanggal].khusus +
-                      hasil[opd].per_tanggal[tanggal].izin;
-        hasil[opd].per_tanggal[tanggal].tanpa_keterangan = Math.max(total - hadir, 0);
+        const hadir =
+          hasil[opd].per_tanggal[tanggal].biasa +
+          hasil[opd].per_tanggal[tanggal].khusus +
+          hasil[opd].per_tanggal[tanggal].izin;
+        hasil[opd].per_tanggal[tanggal].tanpa_keterangan = Math.max(
+          total - hadir,
+          0
+        );
       }
     }
 
@@ -876,12 +1016,13 @@ router.get('/rekap-tabel', async (req, res) => {
       message: "Berhasil mengambil data rekap tabel",
       code: 200,
       data: hasil,
-      hari_libur: [...hariLiburSet]
+      hari_libur: [...hariLiburSet],
     });
-
   } catch (err) {
     console.error("Rekap Tabel Error:", err);
-    res.status(500).json({ message: "Terjadi kesalahan", code: 500, error: err.message });
+    res
+      .status(500)
+      .json({ message: "Terjadi kesalahan", code: 500, error: err.message });
   }
 });
 module.exports = router;
