@@ -3,6 +3,7 @@ const router = express.Router();
 const { sequelize } = require('../models');
 const { QueryTypes } = require('sequelize');
 const moment = require('moment-timezone');
+const { generateDateList } = require('../utils/dateUtils');
 
 // Route to get OPD list
 router.get('/opd-list', async (req, res) => {
@@ -249,6 +250,23 @@ router.get('/presensi', async (req, res) => {
   }
 });
 
+router.get('/opd-list', async (req, res) => {
+  try {
+    const opdListQuery = `
+      SELECT id_opd, nama_opd,
+      FROM opd
+      ORDER BY nama_opd ASC;
+    `;
+    const opdList = await sequelize.query(opdListQuery, {
+      type: QueryTypes.SELECT
+    });
+    res.json(opdList); // Send as JSON
+  } catch (err) {
+    console.error('Error fetching OPS list:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 //Route to get Pangkat dan golongan
 router.get('/pangkat-list', async (req, res) => {
   try {
@@ -288,124 +306,113 @@ router.get('/jabatan-list', async (req, res) => {
 });
 
 //rekap dashboard
+// REKAP UTAMA
 router.get('/rekap', async (req, res) => {
-  const { start_date, end_date, id_opd } = req.query;
+  const { start_date, end_date, id_opd, id_jabatan, id_pangkat } = req.query;
+  if (!start_date || !end_date) {
+    return res.status(400).json({ code: 400, message: 'start_date dan end_date wajib diisi' });
+  }
+
   const start = new Date(start_date);
   const end = new Date(end_date);
-
   const startEpoch = start.setHours(0, 0, 0, 0);
   const endEpoch = end.setHours(23, 59, 59, 999);
-  const replacements = { startEpoch, endEpoch, id_opd };
+  const replacements = { startEpoch, endEpoch, id_opd, id_jabatan, id_pangkat };
+
+  let filterOPD = id_opd ? 'AND b.id_opd = :id_opd' : '';
+  let filterJabatan = id_jabatan ? 'AND b.id_jabatan = :id_jabatan' : '';
+  let filterPangkat = id_pangkat ? 'AND b.id_pangkat = :id_pangkat' : '';
 
   try {
-    // Presensi
-    const presensiData = await sequelize.query(`
-      SELECT p.jam_masuk, p.ket_masuk, p.foto_masuk, b.id_pegawai, b.nama_pegawai, b.nip_pegawai, b.id_opd, c.nama_opd
+    const presensi = await sequelize.query(`
+      SELECT p.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
       FROM presensi p
       JOIN pegawai b ON p.id_pegawai = b.id_pegawai
       LEFT JOIN opd c ON b.id_opd = c.id_opd
       WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
-        ${id_opd ? 'AND b.id_opd = :id_opd' : 'AND b.id_opd != 0'}
+      ${filterOPD} ${filterJabatan} ${filterPangkat}
     `, { type: QueryTypes.SELECT, replacements });
 
-    // Izin
-    const izinData = await sequelize.query(`
-      SELECT a.tanggal_izin, a.tanggal_selesai, a.id_pegawai, b.nama_pegawai, b.nip_pegawai, b.id_opd, c.nama_opd
+    const izin = await sequelize.query(`
+      SELECT a.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
       FROM izin a
       JOIN pegawai b ON a.id_pegawai = b.id_pegawai
       LEFT JOIN opd c ON b.id_opd = c.id_opd
-      WHERE a.verifikasi = 1
-        ${id_opd ? 'AND b.id_opd = :id_opd' : 'AND b.id_opd != 0'}
+      WHERE a.verifikasi = 1 AND a.tanggal_izin BETWEEN :startEpoch AND :endEpoch
+      ${filterOPD} ${filterJabatan} ${filterPangkat}
     `, { type: QueryTypes.SELECT, replacements });
 
-    // Pegawai
     const pegawaiList = await sequelize.query(`
-      SELECT b.id_pegawai, b.nama_pegawai, b.nip_pegawai, b.id_opd, c.nama_opd
+      SELECT b.id_pegawai, b.nama_pegawai, b.nip_pegawai, c.nama_opd
       FROM pegawai b
       LEFT JOIN opd c ON b.id_opd = c.id_opd
-      ${id_opd ? 'WHERE b.id_opd = :id_opd' : 'WHERE b.id_opd != 0'}
+      WHERE 1=1 ${filterOPD} ${filterJabatan} ${filterPangkat}
     `, { type: QueryTypes.SELECT, replacements });
 
-    
     const rekap = {};
-    const detailPegawai = {};
+    const detail = {};
 
-    // Inisialisasi
-    pegawaiList.forEach(({ nama_opd }) => {
-      const opd = nama_opd || 'Tidak Diketahui';
+    pegawaiList.forEach(p => {
+      const opd = p.nama_opd || 'Tidak Diketahui';
       if (!rekap[opd]) {
         rekap[opd] = {};
-        detailPegawai[opd] = { biasa: [], khusus: [], izin: [], tanpa_keterangan: [] };
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const key = d.toISOString().split('T')[0];
-          rekap[opd][key] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
-        }
+        detail[opd] = { biasa: [], khusus: [], izin: [], tanpa_keterangan: [] };
       }
     });
 
-    // Presensi
-    presensiData.forEach(p => {
-      const tanggal = new Date(p.jam_masuk).toISOString().split('T')[0];
-      const opd = p.nama_opd || 'Tidak Diketahui';
-      if (!rekap[opd]?.[tanggal]) return;
+    const tanggalSet = new Set();
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      tanggalSet.add(d.toISOString().split('T')[0]);
+    }
 
+    presensi.forEach(p => {
+      const opd = p.nama_opd || 'Tidak Diketahui';
+      const tanggal = new Date(p.jam_masuk).toISOString().split('T')[0];
+      if (!rekap[opd][tanggal]) {
+        rekap[opd][tanggal] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+      }
       if ((p.ket_masuk || '').startsWith('Biasa')) {
         rekap[opd][tanggal].biasa++;
-        detailPegawai[opd].biasa.push({ ...p, tanggal });
+        detail[opd].biasa.push({ ...p, tanggal });
       } else if ((p.ket_masuk || '').startsWith('Khusus')) {
         rekap[opd][tanggal].khusus++;
-        detailPegawai[opd].khusus.push({ ...p, tanggal });
+        detail[opd].khusus.push({ ...p, tanggal });
       }
     });
 
-    // Izin
-    izinData.forEach(i => {
+    izin.forEach(i => {
       const opd = i.nama_opd || 'Tidak Diketahui';
-      const izinStart = new Date(i.tanggal_izin);
-      const izinEnd = new Date(i.tanggal_selesai);
-
-      for (let d = new Date(izinStart); d <= izinEnd; d.setDate(d.getDate() + 1)) {
-        const key = d.toISOString().split('T')[0];
-        if (rekap[opd]?.[key]) {
-          rekap[opd][key].izin++;
-          detailPegawai[opd].izin.push({ ...i, tanggal: key });
-        }
+      const tanggal = new Date(i.tanggal_izin).toISOString().split('T')[0];
+      if (!rekap[opd][tanggal]) {
+        rekap[opd][tanggal] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
       }
+      rekap[opd][tanggal].izin++;
+      detail[opd].izin.push({ ...i, tanggal });
     });
-    
-    // Tanpa Keterangan
-    Object.entries(rekap).forEach(([opd, tanggalMap]) => {
-      const totalPegawai = pegawaiList.filter(p => p.nama_opd === opd).length;
-      const hadirKeySet = new Set([
-        ...detailPegawai[opd].biasa,
-        ...detailPegawai[opd].khusus,
-        ...detailPegawai[opd].izin
-      ].map(p => `${p.tanggal}_${p.id_pegawai}`));
 
-      Object.entries(tanggalMap).forEach(([tanggal, count]) => {
-        const hadir = count.biasa + count.khusus + count.izin;
-        count.tanpa_keterangan = Math.max(totalPegawai - hadir, 0);
-
-        pegawaiList.forEach(p => {
-          const key = `${tanggal}_${p.id_pegawai}`;
-          if (p.nama_opd === opd && !hadirKeySet.has(key)) {
-            detailPegawai[opd].tanpa_keterangan.push({ ...p, tanggal });
-          }
-        });
+    pegawaiList.forEach(p => {
+      const opd = p.nama_opd || 'Tidak Diketahui';
+      tanggalSet.forEach(tgl => {
+        if (!rekap[opd][tgl]) {
+          rekap[opd][tgl] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+        }
+        const hadir = detail[opd].biasa.concat(detail[opd].khusus, detail[opd].izin)
+          .some(d => d.id_pegawai === p.id_pegawai && d.tanggal === tgl);
+        if (!hadir) {
+          rekap[opd][tgl].tanpa_keterangan++;
+          detail[opd].tanpa_keterangan.push({ ...p, tanggal: tgl });
+        }
       });
     });
 
-    res.json({
-      message: 'Berhasil rekap presensi',
-      code: 200,
-      data: rekap,
-      detail: detailPegawai
-    });
+    res.json({ code: 200, message: 'Berhasil rekap', data: rekap, detail });
   } catch (err) {
-    console.error('Rekap Presensi Error:', err);
-    res.status(500).json({ message: 'Terjadi kesalahan', code: 500, error: err.message });
+    console.error(err);
+    res.status(500).json({ code: 500, message: 'Error', error: err.message });
   }
 });
+
+
 
 // Route to get Presensi data with lateness calculation considering holidays, Ramadan, and weekends
 // router.get('/presensi', async (req, res) => {
@@ -697,5 +704,184 @@ router.get('/rekap', async (req, res) => {
 //   }
 // });
 
+router.get('/rekap-tabel', async (req, res) => {
+  const { start_date, end_date, id_opd, id_jabatan, id_pangkat } = req.query;
 
+  if (!start_date || !end_date) {
+    return res.status(400).json({ message: "Tanggal mulai dan akhir wajib diisi", code: 400 });
+  }
+
+  const start = new Date(start_date);
+  const end = new Date(end_date);
+  const datesInRange = generateDateList(start, end);
+
+  try {
+    // 1. Hari libur
+    const libur = await sequelize.query(`
+      SELECT * FROM hari_libur
+      WHERE DATE(date_start) <= :end_date AND (date_end IS NULL OR DATE(date_end) >= :start_date)
+    `, {
+      type: QueryTypes.SELECT,
+      replacements: { start_date, end_date }
+    });
+
+    const hariLiburSet = new Set();
+    for (const lib of libur) {
+      const libStart = new Date(lib.date_start);
+      const libEnd = lib.date_end ? new Date(lib.date_end) : libStart;
+      const range = generateDateList(libStart, libEnd);
+      range.forEach(d => hariLiburSet.add(d));
+    }
+
+    // 2. Filter hanya tanggal kerja (bukan hari libur atau akhir pekan)
+    const tanggalKerja = datesInRange.filter(dateStr => {
+      const day = new Date(dateStr).getDay();
+      return !hariLiburSet.has(dateStr) && day !== 0 && day !== 6;
+    });
+
+    if (tanggalKerja.length === 0) {
+      return res.json({ message: "Tidak ada hari kerja di rentang ini", code: 200, data: [] });
+    }
+
+    // 3. Query Pegawai
+    let pegawaiQuery = `
+      SELECT b.*, c.nama_opd 
+      FROM pegawai AS b
+      LEFT JOIN opd AS c ON b.id_opd = c.id_opd 
+      WHERE b.id_opd != 0
+    `;
+    const replacements = {};
+
+    if (id_opd) {
+      pegawaiQuery += ' AND b.id_opd = :id_opd';
+      replacements.id_opd = id_opd;
+    }
+    if (id_jabatan) {
+      pegawaiQuery += ' AND b.id_jabatan = :id_jabatan';
+      replacements.id_jabatan = id_jabatan;
+    }
+    if (id_pangkat) {
+      pegawaiQuery += ' AND b.id_pangkat = :id_pangkat';
+      replacements.id_pangkat = id_pangkat;
+    }
+
+    const pegawaiList = await sequelize.query(pegawaiQuery, {
+      type: QueryTypes.SELECT,
+      replacements
+    });
+
+    // 4. Query Presensi
+    const startEpoch = new Date(start).setHours(0, 0, 0, 0);
+    const endEpoch = new Date(end).setHours(23, 59, 59, 999);
+
+    const presensiData = await sequelize.query(`
+      SELECT p.ket_masuk, p.jam_masuk, b.id_pegawai, c.nama_opd 
+      FROM presensi AS p
+      JOIN pegawai AS b ON p.id_pegawai = b.id_pegawai
+      LEFT JOIN opd AS c ON b.id_opd = c.id_opd
+      WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
+      ${id_opd ? 'AND b.id_opd = :id_opd' : ''}
+    `, {
+      type: QueryTypes.SELECT,
+      replacements: { ...replacements, startEpoch, endEpoch }
+    });
+
+    // 5. Query Izin
+    const izinData = await sequelize.query(`
+      SELECT a.id_pegawai, a.tanggal_izin, a.tanggal_selesai, c.nama_opd
+      FROM izin AS a
+      JOIN pegawai AS b ON a.id_pegawai = b.id_pegawai
+      LEFT JOIN opd AS c ON b.id_opd = c.id_opd
+      WHERE a.verifikasi = 1
+      ${id_opd ? 'AND b.id_opd = :id_opd' : ''}
+    `, {
+      type: QueryTypes.SELECT,
+      replacements
+    });
+
+    // 6. Inisialisasi Struktur Data
+    const hasil = {};
+    const pegawaiMap = {};
+    pegawaiList.forEach(p => {
+      pegawaiMap[p.id_pegawai] = p.nama_opd;
+      const opd = p.nama_opd || 'Tidak Diketahui';
+      if (!hasil[opd]) {
+        hasil[opd] = {
+          nama_opd: opd,
+          jumlah_pegawai: 0,
+          per_tanggal: {},
+          pegawai: []
+        };
+      }
+      hasil[opd].jumlah_pegawai++;
+      hasil[opd].pegawai.push({
+        id_pegawai: p.id_pegawai,
+        nama_pegawai: p.nama_pegawai,
+        nip_pegawai: p.nip_pegawai
+      });
+
+      tanggalKerja.forEach(tgl => {
+        if (!hasil[opd].per_tanggal[tgl]) {
+          hasil[opd].per_tanggal[tgl] = {
+            biasa: 0,
+            khusus: 0,
+            izin: 0,
+            tanpa_keterangan: 0
+          };
+        }
+      });
+    });
+
+    // 7. Hitung presensi
+    for (const presensi of presensiData) {
+      const dateKey = new Date(presensi.jam_masuk).toISOString().split('T')[0];
+      const opd = presensi.nama_opd;
+      if (!tanggalKerja.includes(dateKey)) continue;
+      if (!hasil[opd]) continue;
+
+      if (presensi.ket_masuk.startsWith('Biasa')) {
+        hasil[opd].per_tanggal[dateKey].biasa++;
+      } else if (presensi.ket_masuk.startsWith('Khusus')) {
+        hasil[opd].per_tanggal[dateKey].khusus++;
+      }
+    }
+
+    // 8. Hitung izin
+    for (const izin of izinData) {
+      const opd = izin.nama_opd;
+      if (!hasil[opd]) continue;
+
+      const startIzin = new Date(izin.tanggal_izin);
+      const endIzin = new Date(izin.tanggal_selesai);
+      const izinRange = generateDateList(startIzin, endIzin);
+      izinRange.forEach(tgl => {
+        if (tanggalKerja.includes(tgl)) {
+          hasil[opd].per_tanggal[tgl].izin++;
+        }
+      });
+    }
+
+    // 9. Hitung tanpa keterangan
+    for (const opd in hasil) {
+      const total = hasil[opd].jumlah_pegawai;
+      for (const tanggal of tanggalKerja) {
+        const hadir = hasil[opd].per_tanggal[tanggal].biasa +
+                      hasil[opd].per_tanggal[tanggal].khusus +
+                      hasil[opd].per_tanggal[tanggal].izin;
+        hasil[opd].per_tanggal[tanggal].tanpa_keterangan = Math.max(total - hadir, 0);
+      }
+    }
+
+    return res.json({
+      message: "Berhasil mengambil data rekap tabel",
+      code: 200,
+      data: hasil,
+      hari_libur: [...hariLiburSet]
+    });
+
+  } catch (err) {
+    console.error("Rekap Tabel Error:", err);
+    res.status(500).json({ message: "Terjadi kesalahan", code: 500, error: err.message });
+  }
+});
 module.exports = router;
