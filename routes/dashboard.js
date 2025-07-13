@@ -314,6 +314,154 @@ router.get("/jabatan-list", async (req, res) => {
 });
 
 //rekap dashboard
+router.get("/rekap-global", async (req, res) => {
+  const { start_date, end_date } = req.query;
+  if (!start_date || !end_date) {
+    return res.status(400).json({
+      code: 400,
+      message: "start_date dan end_date wajib diisi",
+    });
+  }
+
+  const startEpoch = new Date(start_date + 'T00:00:00Z').getTime();
+  const endEpoch = new Date(end_date + 'T23:59:59Z').getTime();
+
+  try {
+    // Hari libur
+    const libur = await sequelize.query(
+      `SELECT date_start, date_end FROM hari_libur
+       WHERE (date_start BETWEEN :start_date AND :end_date)
+         OR (date_end BETWEEN :start_date AND :end_date)
+         OR (:start_date BETWEEN date_start AND date_end)
+         OR (:end_date BETWEEN date_start AND date_end)`,
+      {
+        type: QueryTypes.SELECT,
+        replacements: { start_date, end_date }
+      }
+    );
+
+    // Set hari libur
+    const hariLiburSet = new Set();
+    libur.forEach(l => {
+      let curr = new Date(l.date_start);
+      const end = new Date(l.date_end);
+      while (curr <= end) {
+        hariLiburSet.add(curr.toISOString().split("T")[0]);
+        curr = new Date(curr.getTime() + 86400000);
+      }
+    });
+
+    // Tanggal kerja
+    const tanggalSet = new Set();
+    let loopDate = new Date(start_date);
+    const loopEnd = new Date(end_date);
+    while (loopDate <= loopEnd) {
+      const day = loopDate.getDay();
+      const tglStr = loopDate.toISOString().split("T")[0];
+      if (day !== 0 && day !== 6 && !hariLiburSet.has(tglStr)) {
+        tanggalSet.add(tglStr);
+      }
+      loopDate.setDate(loopDate.getDate() + 1);
+    }
+
+    // Presensi
+    const presensi = await sequelize.query(`
+      SELECT p.*, b.nama_pegawai
+      FROM presensi p
+      JOIN pegawai b ON p.id_pegawai = b.id_pegawai
+      WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
+    `, {
+      type: QueryTypes.SELECT,
+      replacements: { startEpoch, endEpoch }
+    });
+
+    // Izin
+    const izin = await sequelize.query(`
+      SELECT a.*, b.nama_pegawai
+      FROM izin a
+      JOIN pegawai b ON a.id_pegawai = b.id_pegawai
+      WHERE a.verifikasi = 1 AND a.tanggal_izin BETWEEN :startEpoch AND :endEpoch
+    `, {
+      type: QueryTypes.SELECT,
+      replacements: { startEpoch, endEpoch }
+    });
+
+    // Semua pegawai
+    const pegawaiList = await sequelize.query(`
+      SELECT id_pegawai, nama_pegawai FROM pegawai
+    `, { type: QueryTypes.SELECT });
+
+    const rekap = {};
+    const detail = {
+      biasa: [], khusus: [], izin: [], tanpa_keterangan: []
+    };
+
+    // PRESENSI
+    presensi.forEach(p => {
+      const tanggal = new Date(p.jam_masuk).toISOString().split("T")[0];
+      if (!tanggalSet.has(tanggal)) return;
+      if (!rekap[tanggal]) {
+        rekap[tanggal] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+      }
+
+      if ((p.ket_masuk || '').startsWith('Biasa')) {
+        rekap[tanggal].biasa++;
+        detail.biasa.push({ ...p, tanggal });
+      } else if ((p.ket_masuk || '').startsWith('Khusus')) {
+        rekap[tanggal].khusus++;
+        detail.khusus.push({ ...p, tanggal });
+      }
+    });
+
+    // IZIN
+    izin.forEach(i => {
+      const tanggal = new Date(i.tanggal_izin).toISOString().split("T")[0];
+      if (!tanggalSet.has(tanggal)) return;
+      if (!rekap[tanggal]) {
+        rekap[tanggal] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+      }
+      rekap[tanggal].izin++;
+      detail.izin.push({ ...i, tanggal });
+    });
+
+    // TANPA KETERANGAN
+    pegawaiList.forEach(p => {
+      tanggalSet.forEach(tgl => {
+        const hadir = detail.biasa.concat(detail.khusus, detail.izin)
+          .some(d => d.id_pegawai === p.id_pegawai && d.tanggal === tgl);
+        if (!hadir) {
+          if (!rekap[tgl]) {
+            rekap[tgl] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
+          }
+          rekap[tgl].tanpa_keterangan++;
+          detail.tanpa_keterangan.push({ ...p, tanggal: tgl });
+        }
+      });
+    });
+
+    // Sorting tanggal
+    const sortedRekap = Object.keys(rekap).sort().reduce((acc, key) => {
+      acc[key] = rekap[key];
+      return acc;
+    }, {});
+
+    return res.json({
+      code: 200,
+      message: "Berhasil rekap global",
+      data: sortedRekap,
+      detail
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      code: 500,
+      message: "Error",
+      error: err.message,
+    });
+  }
+});
+
+
 // REKAP UTAMA
 router.get("/rekap", async (req, res) => {
   const { start_date, end_date, id_opd, id_jabatan, id_pangkat } = req.query;
