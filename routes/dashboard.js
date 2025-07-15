@@ -3,7 +3,7 @@ const router = express.Router();
 const { sequelize } = require("../models");
 const { QueryTypes } = require("sequelize");
 const moment = require("moment-timezone");
-const { generateDateList } = require("../utils/dateUtils");
+//const { generateDateList } = require("../utils/dateUtils");
 
 // Route to get OPD list
 router.get("/opd-list", async (req, res) => {
@@ -323,8 +323,8 @@ router.get("/rekap-global", async (req, res) => {
     });
   }
 
-  const startEpoch = new Date(start_date + 'T00:00:00Z').getTime();
-  const endEpoch = new Date(end_date + 'T23:59:59Z').getTime();
+  const startEpoch = new Date(start_date + "T00:00:00Z").getTime();
+  const endEpoch = new Date(end_date + "T23:59:59Z").getTime();
 
   try {
     // Hari libur
@@ -336,13 +336,13 @@ router.get("/rekap-global", async (req, res) => {
          OR (:end_date BETWEEN date_start AND date_end)`,
       {
         type: QueryTypes.SELECT,
-        replacements: { start_date, end_date }
+        replacements: { start_date, end_date },
       }
     );
 
     // Set hari libur
     const hariLiburSet = new Set();
-    libur.forEach(l => {
+    libur.forEach((l) => {
       let curr = new Date(l.date_start);
       const end = new Date(l.date_end);
       while (curr <= end) {
@@ -365,56 +365,68 @@ router.get("/rekap-global", async (req, res) => {
     }
 
     // Presensi
-    const presensi = await sequelize.query(`
+    const presensi = await sequelize.query(
+      `
       SELECT p.*, b.nama_pegawai
       FROM presensi p
       JOIN pegawai b ON p.id_pegawai = b.id_pegawai
       WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
-    `, {
-      type: QueryTypes.SELECT,
-      replacements: { startEpoch, endEpoch }
-    });
+    `,
+      {
+        type: QueryTypes.SELECT,
+        replacements: { startEpoch, endEpoch },
+      }
+    );
 
     // Izin
-    const izin = await sequelize.query(`
+    const izin = await sequelize.query(
+      `
       SELECT a.*, b.nama_pegawai
       FROM izin a
       JOIN pegawai b ON a.id_pegawai = b.id_pegawai
       WHERE a.verifikasi = 1 AND a.tanggal_izin BETWEEN :startEpoch AND :endEpoch
-    `, {
-      type: QueryTypes.SELECT,
-      replacements: { startEpoch, endEpoch }
-    });
+    `,
+      {
+        type: QueryTypes.SELECT,
+        replacements: { startEpoch, endEpoch },
+      }
+    );
 
     // Semua pegawai
-    const pegawaiList = await sequelize.query(`
+    const pegawaiList = await sequelize.query(
+      `
       SELECT id_pegawai, nama_pegawai FROM pegawai
-    `, { type: QueryTypes.SELECT });
+    `,
+      { type: QueryTypes.SELECT }
+    );
 
     const rekap = {};
     const detail = {
-      biasa: [], khusus: [], izin: [], tanpa_keterangan: []
+      biasa: [],
+      khusus: [],
+      izin: [],
+      tanpa_keterangan: [],
     };
 
     // PRESENSI
-    presensi.forEach(p => {
+    presensi.forEach((p) => {
       const tanggal = new Date(p.jam_masuk).toISOString().split("T")[0];
       if (!tanggalSet.has(tanggal)) return;
       if (!rekap[tanggal]) {
         rekap[tanggal] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
       }
 
-      if ((p.ket_masuk || '').startsWith('Biasa')) {
+      if ((p.ket_masuk || "").startsWith("Biasa")) {
         rekap[tanggal].biasa++;
         detail.biasa.push({ ...p, tanggal });
-      } else if ((p.ket_masuk || '').startsWith('Khusus')) {
+      } else if ((p.ket_masuk || "").startsWith("Khusus")) {
         rekap[tanggal].khusus++;
         detail.khusus.push({ ...p, tanggal });
       }
     });
 
     // IZIN
-    izin.forEach(i => {
+    izin.forEach((i) => {
       const tanggal = new Date(i.tanggal_izin).toISOString().split("T")[0];
       if (!tanggalSet.has(tanggal)) return;
       if (!rekap[tanggal]) {
@@ -425,10 +437,11 @@ router.get("/rekap-global", async (req, res) => {
     });
 
     // TANPA KETERANGAN
-    pegawaiList.forEach(p => {
-      tanggalSet.forEach(tgl => {
-        const hadir = detail.biasa.concat(detail.khusus, detail.izin)
-          .some(d => d.id_pegawai === p.id_pegawai && d.tanggal === tgl);
+    pegawaiList.forEach((p) => {
+      tanggalSet.forEach((tgl) => {
+        const hadir = detail.biasa
+          .concat(detail.khusus, detail.izin)
+          .some((d) => d.id_pegawai === p.id_pegawai && d.tanggal === tgl);
         if (!hadir) {
           if (!rekap[tgl]) {
             rekap[tgl] = { biasa: 0, khusus: 0, izin: 0, tanpa_keterangan: 0 };
@@ -440,16 +453,18 @@ router.get("/rekap-global", async (req, res) => {
     });
 
     // Sorting tanggal
-    const sortedRekap = Object.keys(rekap).sort().reduce((acc, key) => {
-      acc[key] = rekap[key];
-      return acc;
-    }, {});
+    const sortedRekap = Object.keys(rekap)
+      .sort()
+      .reduce((acc, key) => {
+        acc[key] = rekap[key];
+        return acc;
+      }, {});
 
     return res.json({
       code: 200,
       message: "Berhasil rekap global",
       data: sortedRekap,
-      detail
+      detail,
     });
   } catch (err) {
     console.error(err);
@@ -461,7 +476,6 @@ router.get("/rekap-global", async (req, res) => {
   }
 });
 
-
 // REKAP UTAMA
 router.get("/rekap", async (req, res) => {
   const { start_date, end_date, id_opd, id_jabatan, id_pangkat } = req.query;
@@ -472,8 +486,8 @@ router.get("/rekap", async (req, res) => {
     });
   }
 
-  const startEpoch = new Date(start_date + 'T00:00:00Z').getTime();
-  const endEpoch = new Date(end_date + 'T23:59:59Z').getTime();
+  const startEpoch = new Date(start_date + "T00:00:00Z").getTime();
+  const endEpoch = new Date(end_date + "T23:59:59Z").getTime();
 
   const replacements = {
     startEpoch,
@@ -501,25 +515,25 @@ router.get("/rekap", async (req, res) => {
         type: QueryTypes.SELECT,
         replacements: {
           start_date,
-          end_date
+          end_date,
         },
       }
     );
 
     // Siapkan set tanggal libur
     const hariLiburSet = new Set();
-libur.forEach(l => {
-  let curr = new Date(l.date_start);
-  const end = new Date(l.date_end);
+    libur.forEach((l) => {
+      let curr = new Date(l.date_start);
+      const end = new Date(l.date_end);
 
-  while (curr <= end) {
-    const tgl = curr.toISOString().split("T")[0];
-    hariLiburSet.add(tgl);
+      while (curr <= end) {
+        const tgl = curr.toISOString().split("T")[0];
+        hariLiburSet.add(tgl);
 
-    // Hati-hati! Buat objek baru agar curr tidak corrupt
-    curr = new Date(curr.getTime() + 86400000); // +1 hari
-  }
-});
+        // Hati-hati! Buat objek baru agar curr tidak corrupt
+        curr = new Date(curr.getTime() + 86400000); // +1 hari
+      }
+    });
 
     // Generate hanya hari kerja
     const tanggalSet = new Set();
@@ -548,16 +562,35 @@ libur.forEach(l => {
     );
 
     // IZIN
+    // Hitung rentang epoch
+    const startEpochSec = Math.floor(
+      new Date(start_date + "T00:00:00Z").getTime() / 1000
+    );
+    const endEpochSec = Math.floor(
+      new Date(end_date + "T23:59:59Z").getTime() / 1000
+    );
+
+    // Jalankan query izin
     const izin = await sequelize.query(
       `
-      SELECT a.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
-      FROM izin a
-      JOIN pegawai b ON a.id_pegawai = b.id_pegawai
-      LEFT JOIN opd c ON b.id_opd = c.id_opd
-      WHERE a.verifikasi = 1 AND a.tanggal_izin BETWEEN :startEpoch AND :endEpoch
-      ${filterOPD} ${filterJabatan} ${filterPangkat}
-    `,
-      { type: QueryTypes.SELECT, replacements }
+  SELECT a.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
+  FROM izin a
+  JOIN pegawai b ON a.id_pegawai = b.id_pegawai
+  LEFT JOIN opd c ON b.id_opd = c.id_opd
+  WHERE 
+    a.tanggal_izin REGEXP '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'
+    AND UNIX_TIMESTAMP(STR_TO_DATE(a.tanggal_izin, '%d/%m/%Y')) 
+        BETWEEN :startEpochSec AND :endEpochSec
+    ${filterOPD} ${filterJabatan} ${filterPangkat}
+  `,
+      {
+        type: QueryTypes.SELECT,
+        replacements: {
+          startEpochSec,
+          endEpochSec,
+          ...replacements,
+        },
+      }
     );
 
     // PEGAWAI
@@ -611,11 +644,23 @@ libur.forEach(l => {
       }
     });
 
-    // IZIN
+    // IZIN Count
     izin.forEach((i) => {
       const opd = i.nama_opd || "Tidak Diketahui";
-      const tanggal = new Date(i.tanggal_izin).toISOString().split("T")[0];
-      if (!tanggalSet.has(tanggal)) return;
+
+      // Parse manual tanggal_izin yang formatnya DD/MM/YYYY
+      let tanggal = null;
+      if (i.tanggal_izin && i.tanggal_izin.includes("/")) {
+        const [d, m, y] = i.tanggal_izin.split("/");
+        // Hasilkan string tanggal standar YYYY-MM-DD
+        tanggal = `${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(
+          2,
+          "0"
+        )}`;
+      }
+
+      // Kalau tanggal tidak valid, langsung skip
+      if (!tanggal || !tanggalSet.has(tanggal)) return;
 
       if (!rekap[opd][tanggal]) {
         rekap[opd][tanggal] = {
@@ -680,8 +725,6 @@ libur.forEach(l => {
     });
   }
 });
-
-
 
 // Route to get Presensi data with lateness calculation considering holidays, Ramadan, and weekends
 // router.get('/presensi', async (req, res) => {
