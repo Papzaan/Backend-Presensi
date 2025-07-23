@@ -486,8 +486,9 @@ router.get("/rekap", async (req, res) => {
     });
   }
 
-  const startEpoch = new Date(start_date + "T00:00:00Z").getTime();
-  const endEpoch = new Date(end_date + "T23:59:59Z").getTime();
+  // Hitung epoch dengan zona WIB (UTC+7)
+  const startEpoch = new Date(start_date + "T00:01:00+07:00").getTime();
+  const endEpoch = new Date(end_date + "T23:59:59+07:00").getTime();
 
   const replacements = {
     startEpoch,
@@ -527,21 +528,26 @@ router.get("/rekap", async (req, res) => {
       const end = new Date(l.date_end);
 
       while (curr <= end) {
-        const tgl = curr.toISOString().split("T")[0];
+        const year = curr.getFullYear();
+        const month = String(curr.getMonth() + 1).padStart(2, "0");
+        const day = String(curr.getDate()).padStart(2, "0");
+        const tgl = `${year}-${month}-${day}`;
         hariLiburSet.add(tgl);
 
-        // Hati-hati! Buat objek baru agar curr tidak corrupt
         curr = new Date(curr.getTime() + 86400000); // +1 hari
       }
     });
 
     // Generate hanya hari kerja
     const tanggalSet = new Set();
-    let loopDate = new Date(start_date);
-    const loopEndDate = new Date(end_date);
+    let loopDate = new Date(start_date + "T00:00:00+07:00");
+    const loopEndDate = new Date(end_date + "T00:00:00+07:00");
     while (loopDate <= loopEndDate) {
       const day = loopDate.getDay();
-      const tglStr = loopDate.toISOString().split("T")[0];
+      const year = loopDate.getFullYear();
+      const month = String(loopDate.getMonth() + 1).padStart(2, "0");
+      const date = String(loopDate.getDate()).padStart(2, "0");
+      const tglStr = `${year}-${month}-${date}`;
       if (day !== 0 && day !== 6 && !hariLiburSet.has(tglStr)) {
         tanggalSet.add(tglStr);
       }
@@ -562,27 +568,21 @@ router.get("/rekap", async (req, res) => {
     );
 
     // IZIN
-    // Hitung rentang epoch
-    const startEpochSec = Math.floor(
-      new Date(start_date + "T00:00:00Z").getTime() / 1000
-    );
-    const endEpochSec = Math.floor(
-      new Date(end_date + "T23:59:59Z").getTime() / 1000
-    );
+    const startEpochSec = Math.floor(startEpoch / 1000);
+    const endEpochSec = Math.floor(endEpoch / 1000);
 
-    // Jalankan query izin
     const izin = await sequelize.query(
       `
-  SELECT a.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
-  FROM izin a
-  JOIN pegawai b ON a.id_pegawai = b.id_pegawai
-  LEFT JOIN opd c ON b.id_opd = c.id_opd
-  WHERE 
-    a.tanggal_izin REGEXP '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'
-    AND UNIX_TIMESTAMP(STR_TO_DATE(a.tanggal_izin, '%d/%m/%Y')) 
-        BETWEEN :startEpochSec AND :endEpochSec
-    ${filterOPD} ${filterJabatan} ${filterPangkat}
-  `,
+      SELECT a.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
+      FROM izin a
+      JOIN pegawai b ON a.id_pegawai = b.id_pegawai
+      LEFT JOIN opd c ON b.id_opd = c.id_opd
+      WHERE 
+        a.tanggal_izin REGEXP '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'
+        AND UNIX_TIMESTAMP(STR_TO_DATE(a.tanggal_izin, '%d/%m/%Y')) 
+            BETWEEN :startEpochSec AND :endEpochSec
+        ${filterOPD} ${filterJabatan} ${filterPangkat}
+    `,
       {
         type: QueryTypes.SELECT,
         replacements: {
@@ -623,7 +623,12 @@ router.get("/rekap", async (req, res) => {
     // PRESENSI
     presensi.forEach((p) => {
       const opd = p.nama_opd || "Tidak Diketahui";
-      const tanggal = new Date(p.jam_masuk).toISOString().split("T")[0];
+      const d = new Date(p.jam_masuk); // WIB lokal
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const tanggal = `${year}-${month}-${day}`;
+
       if (!tanggalSet.has(tanggal)) return;
 
       if (!rekap[opd][tanggal]) {
@@ -648,18 +653,15 @@ router.get("/rekap", async (req, res) => {
     izin.forEach((i) => {
       const opd = i.nama_opd || "Tidak Diketahui";
 
-      // Parse manual tanggal_izin yang formatnya DD/MM/YYYY
       let tanggal = null;
       if (i.tanggal_izin && i.tanggal_izin.includes("/")) {
         const [d, m, y] = i.tanggal_izin.split("/");
-        // Hasilkan string tanggal standar YYYY-MM-DD
         tanggal = `${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(
           2,
           "0"
         )}`;
       }
 
-      // Kalau tanggal tidak valid, langsung skip
       if (!tanggal || !tanggalSet.has(tanggal)) return;
 
       if (!rekap[opd][tanggal]) {
