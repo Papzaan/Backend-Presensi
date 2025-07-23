@@ -130,8 +130,8 @@ module.exports = {
                         code: 403
                     })
                 } else {
-                    const random = moment.now() + path.extname(req.file.originalname)
-                    const foto = global.appRoot + '/files/foto/' + random
+                    const random = moment.now() +'' + req.body.id_pegawai+ path.extname(req.file.originalname) 
+                    const foto = global.appRoot + '/files/foto/' + random 
                     const url = 'http://localhost:3000/foto/' + random
 
                     fs.rename(req.file.path, foto, function (err) {
