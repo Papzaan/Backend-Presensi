@@ -6,13 +6,14 @@ module.exports = {
         try {
             let token = req.get("Authorization")
             token = token.slice(7)
-            jwt.verify(token, process.env.TOKEN_AUTH, null, (err) => {
+            jwt.verify(token, process.env.TOKEN_AUTH, null, (err, decoded) => {
                 if (err) {
                     res.json({
                         message: "Expired Token",
                         code: 401
                     })
                 } else {
+                    req.user = decoded,
                     next()
                 }
             })
@@ -44,6 +45,7 @@ module.exports = {
                             level: level
                         })
                     }
+                    req.user = decoded,
                     next()
                 }
             })
@@ -75,6 +77,7 @@ module.exports = {
                             level: level
                         })
                     }
+                    req.user = decoded,
                     next()
                 }
             })
@@ -105,6 +108,7 @@ module.exports = {
                             level: level
                         })
                     }
+                    req.user = decoded,
                     next()
                 }
             })

@@ -176,7 +176,15 @@ module.exports = {
         }
     },
     presensiSiang: async (req, res) => {
+        const id_pegawai = req.user?.pegawai?.id_pegawai;
         const find = await Presensi.findOne({where: {id_presensi: req.params.id_presensi}})
+
+        if (!id_pegawai) {
+            return res.json({
+                message: "ID Pegawai tidak ditemukan dari token",
+                code: 400
+            });
+        }
 
         if (!req.file) {
             return res.json({
@@ -184,7 +192,7 @@ module.exports = {
                 code: 403
             })
         } else {
-            const random = moment.now() + '' + req.body.id_pegawai + path.extname(req.file.originalname)
+            const random = moment.now() + '' + id_pegawai + path.extname(req.file.originalname)
             const foto = global.appRoot + '/files/foto/' + random
             const url = 'http://localhost:3000/foto/' + random
 
@@ -226,7 +234,15 @@ module.exports = {
         }
     },
     presensiPulang: async (req, res) => {
+        const id_pegawai = req.user?.pegawai?.id_pegawai;
         const find = await Presensi.findOne({where: {id_presensi: req.params.id_presensi}})
+
+        if (!id_pegawai) {
+            return res.json({
+                message: "ID Pegawai tidak ditemukan dari token",
+                code: 400
+            });
+        }
 
         if (!req.file) {
             return res.json({
@@ -234,7 +250,7 @@ module.exports = {
                 code: 403
             })
         } else {
-            const random = moment.now() + '' + req.body.id_pegawai+ path.extname(req.file.originalname)
+            const random = moment.now() + '' + id_pegawai+ path.extname(req.file.originalname)
             const foto = global.appRoot + '/files/foto/' + random
             const url = 'http://localhost:3000/foto/' + random
 
@@ -277,7 +293,16 @@ module.exports = {
         }
     },
     ubahPresensi: async (req, res) => {
+        const id_pegawai = req.user?.pegawai?.id_pegawai;
         const find = await Presensi.findOne({where: {id_presensi: req.params.id_presensi}})
+
+        if (!id_pegawai) {
+            return res.json({
+                message: "ID Pegawai tidak ditemukan dari token",
+                code: 400
+            });
+        }
+
 
         if (!req.file) {
             if (find === null) {
@@ -312,7 +337,7 @@ module.exports = {
                 }
             }
         } else {
-            const random = moment.now() +'' + req.body.id_pegawai+ path.extname(req.file.originalname)
+            const random = moment.now() +'' + id_pegawai+ path.extname(req.file.originalname)
             const foto = global.appRoot + '/files/foto/' + random
             const url = 'http://localhost:3000/foto/' + random
 
