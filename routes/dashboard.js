@@ -5,6 +5,31 @@ const { QueryTypes } = require("sequelize");
 const moment = require("moment-timezone");
 //const { generateDateList } = require("../utils/dateUtils");
 
+//route to get eselon 2 3
+router.get("/eselon-list", async (req, res) => {
+  try {
+    const eselonListQuery = `
+      SELECT 
+    pr.*, 
+    pg.nama_pegawai, 
+    pg.id_opd, 
+    j.id_jabatan, 
+    j.eselon
+FROM jabatan j
+JOIN pegawai pg ON pg.id_jabatan = j.id_jabatan
+JOIN presensi pr ON pr.id_pegawai = pg.id_pegawai
+WHERE j.eselon IN ('2' ,'3');
+    `;
+    const eselonList = await sequelize.query(eselonListQuery, {
+      type: QueryTypes.SELECT,
+    });
+    res.json(eselonList); // Sending response as JSON
+  } catch (err) {
+    console.error("Error fetching Eselon list:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 // Route to get OPD list
 router.get("/opd-list", async (req, res) => {
   try {
