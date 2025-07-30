@@ -20,6 +20,7 @@ const kantor = require('./routes/kantor');
 const sseRouter = require('./routes/sse'); 
 const dashboardRouter = require('./routes/dashboard');  // Import the dashboard.js router
 const tokenValidationRouter = require('./routes/tokenValidation');
+const eselonRoutes = require('./routes/eselon');
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/v1/pegawai', pegawaiRouter);
 app.use('/api/v1/presensi', presensiRouter);
 app.use('/api/v1/hari-libur', hariLiburRouter);
 app.use('/api/v1/kantor', kantor);
+app.use('/api/v1/eselon', eselonRoutes);
 
 app.use('/api/v1/stream', sseRouter); // make sure the path doesn't conflict with other routes
 app.use('/api/v1/dashboard', dashboardRouter); 
