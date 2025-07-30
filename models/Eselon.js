@@ -2,6 +2,8 @@ const moment = require("moment-timezone");
 const {toStringFromDate} = require("../middlewares/time_handler");
 moment.locale('id-ID')
 
+
+
 module.exports = (Sequelize, Datatypes) => {
     return Sequelize.define('Presensi', {
         id_presensi: {

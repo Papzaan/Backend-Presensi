@@ -4,8 +4,8 @@ const {toString, toDate, toTime} = require("../middlewares/time_handler");
 const fs = require("fs");
 const path = require("path")
 const {QueryTypes} = require("sequelize");
-const db = require("../models")
-
+const db = require("../models"); 
+// 
 
 const getEselonList = async (req, res) => {
   try {
@@ -20,7 +20,7 @@ FROM jabatan j
 JOIN pegawai pg ON pg.id_jabatan = j.id_jabatan
 JOIN presensi pr ON pr.id_pegawai = pg.id_pegawai
 WHERE j.eselon IN ('2' ,'3')
-  AND DATE(STR_TO_DATE(pr.created_at, '%d/%m/%Y %H.%i.%s')) = CURDATE();
+AND DATE(STR_TO_DATE(pr.created_at, '%d/%m/%Y %H.%i.%s')) = CURDATE();
     `;
 
     const results = await db.sequelize.query(query, {
