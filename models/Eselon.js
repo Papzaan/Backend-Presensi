@@ -82,6 +82,10 @@ module.exports = (Sequelize, Datatypes) => {
         eselon: {
             type: Datatypes.STRING,
             allowNull: true
+        },
+        no_whatsapp: {
+            type: Datatypes.STRING,
+            allowNull: true
         }
 
     }, {

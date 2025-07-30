@@ -14,6 +14,7 @@ const getEselonList = async (req, res) => {
     pr.*, 
     pg.nama_pegawai, 
     pg.id_opd, 
+    pg.no_whatsapp,
     j.id_jabatan, 
     j.eselon
 FROM jabatan j
