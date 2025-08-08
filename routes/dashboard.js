@@ -379,8 +379,8 @@ router.get("/rekap-persentase", async (req, res) => {
 
     // Hari kerja
     const tanggalSet = new Set();
-    let loopDate = new Date(start_date + "T00:00:00+07:00");
-    const loopEnd = new Date(end_date + "T00:00:00+07:00");
+    let loopDate = new Date(start_date);
+    const loopEnd = new Date(end_date);
     while (loopDate <= loopEnd) {
       const day = loopDate.getDay();
       const tglStr = loopDate.toISOString().split("T")[0];
@@ -537,14 +537,20 @@ router.get("/rekap-persentase", async (req, res) => {
 });
 
 //rekap dashboard
+// REKAP GLOBAL
 router.get("/rekap-global", async (req, res) => {
-  const { start_date, end_date } = req.query;
+  const { start_date, end_date, id_opd, id_jabatan, id_pangkat } = req.query;
   if (!start_date || !end_date) {
     return res.status(400).json({
       code: 400,
       message: "start_date dan end_date wajib diisi",
     });
   }
+
+  // Parsing multi select jadi array
+  const id_opd_list = id_opd ? id_opd.split(",").map(Number) : [];
+  const id_jabatan_list = id_jabatan ? id_jabatan.split(",").map(Number) : [];
+  const id_pangkat_list = id_pangkat ? id_pangkat.split(",").map(Number) : [];
 
   const startEpoch = new Date(start_date + "T00:00:00Z").getTime();
   const endEpoch = new Date(end_date + "T23:59:59Z").getTime();
@@ -573,7 +579,7 @@ router.get("/rekap-global", async (req, res) => {
       }
     });
 
-    // Tanggal kerja (Senin–Jumat dan bukan hari libur)
+    // Tanggal kerja
     const tanggalSet = new Set();
     let loopDate = new Date(start_date);
     const loopEnd = new Date(end_date);
@@ -586,12 +592,23 @@ router.get("/rekap-global", async (req, res) => {
       loopDate.setDate(loopDate.getDate() + 1);
     }
 
-    // Data pegawai
+    // Data pegawai dengan filter multi select
+    let filterPegawai = "";
+    if (id_opd_list.length) filterPegawai += " AND p.id_opd IN (:id_opd_list)";
+    if (id_jabatan_list.length)
+      filterPegawai += " AND p.id_jabatan IN (:id_jabatan_list)";
+    if (id_pangkat_list.length)
+      filterPegawai += " AND p.id_pangkat IN (:id_pangkat_list)";
+
     const pegawai = await sequelize.query(
       `SELECT p.id_pegawai, p.nama_pegawai, o.nama_opd
        FROM pegawai p
-       JOIN opd o ON p.id_opd = o.id_opd`,
-      { type: QueryTypes.SELECT }
+       JOIN opd o ON p.id_opd = o.id_opd
+       WHERE 1=1 ${filterPegawai}`,
+      {
+        type: QueryTypes.SELECT,
+        replacements: { id_opd_list, id_jabatan_list, id_pangkat_list },
+      }
     );
 
     const pegawaiMap = {};
@@ -607,10 +624,28 @@ router.get("/rekap-global", async (req, res) => {
     const presensi = await sequelize.query(
       `SELECT p.id_pegawai, p.jam_masuk, p.ket_masuk
        FROM presensi p
-       WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch`,
+       JOIN pegawai peg ON p.id_pegawai = peg.id_pegawai
+       WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
+       ${id_opd_list.length ? "AND peg.id_opd IN (:id_opd_list)" : ""}
+       ${
+         id_jabatan_list.length
+           ? "AND peg.id_jabatan IN (:id_jabatan_list)"
+           : ""
+       }
+       ${
+         id_pangkat_list.length
+           ? "AND peg.id_pangkat IN (:id_pangkat_list)"
+           : ""
+       }`,
       {
         type: QueryTypes.SELECT,
-        replacements: { startEpoch, endEpoch },
+        replacements: {
+          startEpoch,
+          endEpoch,
+          id_opd_list,
+          id_jabatan_list,
+          id_pangkat_list,
+        },
       }
     );
 
@@ -639,10 +674,28 @@ router.get("/rekap-global", async (req, res) => {
     const izin = await sequelize.query(
       `SELECT i.id_pegawai, i.tanggal_izin
        FROM izin i
-       WHERE i.verifikasi = 1 AND i.tanggal_izin BETWEEN :startEpoch AND :endEpoch`,
+       JOIN pegawai peg ON i.id_pegawai = peg.id_pegawai
+       WHERE i.verifikasi = 1 AND i.tanggal_izin BETWEEN :startEpoch AND :endEpoch
+       ${id_opd_list.length ? "AND peg.id_opd IN (:id_opd_list)" : ""}
+       ${
+         id_jabatan_list.length
+           ? "AND peg.id_jabatan IN (:id_jabatan_list)"
+           : ""
+       }
+       ${
+         id_pangkat_list.length
+           ? "AND peg.id_pangkat IN (:id_pangkat_list)"
+           : ""
+       }`,
       {
         type: QueryTypes.SELECT,
-        replacements: { startEpoch, endEpoch },
+        replacements: {
+          startEpoch,
+          endEpoch,
+          id_opd_list,
+          id_jabatan_list,
+          id_pangkat_list,
+        },
       }
     );
 
@@ -681,7 +734,6 @@ router.get("/rekap-global", async (req, res) => {
       const d = data[opd];
       const totalPresensi =
         d.biasa + d.khusus + d.izin + d.tanpa_keterangan || 1;
-
       d.persentase = {
         biasa: Math.round((d.biasa / totalPresensi) * 1000) / 10,
         khusus: Math.round((d.khusus / totalPresensi) * 1000) / 10,
@@ -703,6 +755,7 @@ router.get("/rekap-global", async (req, res) => {
 });
 
 // REKAP UTAMA
+// REKAP UTAMA (support multi select)
 router.get("/rekap", async (req, res) => {
   const { start_date, end_date, id_opd, id_jabatan, id_pangkat } = req.query;
   if (!start_date || !end_date) {
@@ -712,22 +765,27 @@ router.get("/rekap", async (req, res) => {
     });
   }
 
-  const startEpoch = new Date(start_date + "T00:01:00+07:00").getTime();
+  // Parsing multi select
+  const id_opd_list = id_opd ? id_opd.split(",").map(Number) : [];
+  const id_jabatan_list = id_jabatan ? id_jabatan.split(",").map(Number) : [];
+  const id_pangkat_list = id_pangkat ? id_pangkat.split(",").map(Number) : [];
+
+  const startEpoch = new Date(start_date + "T00:00:00+07:00").getTime();
   const endEpoch = new Date(end_date + "T23:59:59+07:00").getTime();
+  const startEpochSec = Math.floor(startEpoch / 1000);
+  const endEpochSec = Math.floor(endEpoch / 1000);
 
-  const replacements = {
-    startEpoch,
-    endEpoch,
-    id_opd,
-    id_jabatan,
-    id_pangkat,
-  };
-
-  const filterOPD = id_opd ? "AND b.id_opd = :id_opd" : "";
-  const filterJabatan = id_jabatan ? "AND b.id_jabatan = :id_jabatan" : "";
-  const filterPangkat = id_pangkat ? "AND b.id_pangkat = :id_pangkat" : "";
+  // Filter SQL
+  const filterOPD = id_opd_list.length ? "AND b.id_opd IN (:id_opd_list)" : "";
+  const filterJabatan = id_jabatan_list.length
+    ? "AND b.id_jabatan IN (:id_jabatan_list)"
+    : "";
+  const filterPangkat = id_pangkat_list.length
+    ? "AND b.id_pangkat IN (:id_pangkat_list)"
+    : "";
 
   try {
+    // Hari libur
     const libur = await sequelize.query(
       `
       SELECT date_start, date_end FROM hari_libur
@@ -738,10 +796,7 @@ router.get("/rekap", async (req, res) => {
     `,
       {
         type: QueryTypes.SELECT,
-        replacements: {
-          start_date,
-          end_date,
-        },
+        replacements: { start_date, end_date },
       }
     );
 
@@ -756,18 +811,23 @@ router.get("/rekap", async (req, res) => {
       }
     });
 
+    // Tanggal kerja
     const tanggalSet = new Set();
     let loopDate = new Date(start_date + "T00:00:00+07:00");
     const loopEndDate = new Date(end_date + "T00:00:00+07:00");
     while (loopDate <= loopEndDate) {
       const day = loopDate.getDay();
-      const tglStr = loopDate.toISOString().slice(0, 10);
+      const year = loopDate.getFullYear();
+      const month = String(loopDate.getMonth() + 1).padStart(2, "0");
+      const date = String(loopDate.getDate()).padStart(2, "0");
+      const tglStr = `${year}-${month}-${date}`;
       if (day !== 0 && day !== 6 && !hariLiburSet.has(tglStr)) {
         tanggalSet.add(tglStr);
       }
       loopDate.setDate(loopDate.getDate() + 1);
     }
 
+    // Presensi
     const presensi = await sequelize.query(
       `
       SELECT p.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
@@ -777,12 +837,19 @@ router.get("/rekap", async (req, res) => {
       WHERE p.jam_masuk BETWEEN :startEpoch AND :endEpoch
       ${filterOPD} ${filterJabatan} ${filterPangkat}
     `,
-      { type: QueryTypes.SELECT, replacements }
+      {
+        type: QueryTypes.SELECT,
+        replacements: {
+          startEpoch,
+          endEpoch,
+          id_opd_list,
+          id_jabatan_list,
+          id_pangkat_list,
+        },
+      }
     );
 
-    const startEpochSec = Math.floor(startEpoch / 1000);
-    const endEpochSec = Math.floor(endEpoch / 1000);
-
+    // Izin
     const izin = await sequelize.query(
       `
       SELECT a.*, b.nama_pegawai, b.nip_pegawai, c.nama_opd
@@ -793,18 +860,21 @@ router.get("/rekap", async (req, res) => {
         a.tanggal_izin REGEXP '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'
         AND UNIX_TIMESTAMP(STR_TO_DATE(a.tanggal_izin, '%d/%m/%Y')) 
             BETWEEN :startEpochSec AND :endEpochSec
-        ${filterOPD} ${filterJabatan} ${filterPangkat}
+      ${filterOPD} ${filterJabatan} ${filterPangkat}
     `,
       {
         type: QueryTypes.SELECT,
         replacements: {
           startEpochSec,
           endEpochSec,
-          ...replacements,
+          id_opd_list,
+          id_jabatan_list,
+          id_pangkat_list,
         },
       }
     );
 
+    // Pegawai
     const pegawaiList = await sequelize.query(
       `
       SELECT b.id_pegawai, b.nama_pegawai, b.nip_pegawai, c.nama_opd
@@ -812,9 +882,13 @@ router.get("/rekap", async (req, res) => {
       LEFT JOIN opd c ON b.id_opd = c.id_opd
       WHERE 1=1 ${filterOPD} ${filterJabatan} ${filterPangkat}
     `,
-      { type: QueryTypes.SELECT, replacements }
+      {
+        type: QueryTypes.SELECT,
+        replacements: { id_opd_list, id_jabatan_list, id_pangkat_list },
+      }
     );
 
+    // Rekap dan detail
     const rekap = {};
     const detail = {};
 
@@ -822,18 +896,14 @@ router.get("/rekap", async (req, res) => {
       const opd = p.nama_opd || "Tidak Diketahui";
       if (!rekap[opd]) {
         rekap[opd] = {};
-        detail[opd] = {
-          biasa: [],
-          khusus: [],
-          izin: [],
-          tanpa_keterangan: [],
-        };
+        detail[opd] = { biasa: [], khusus: [], izin: [], tanpa_keterangan: [] };
       }
     });
 
     presensi.forEach((p) => {
       const opd = p.nama_opd || "Tidak Diketahui";
-      const tanggal = new Date(p.jam_masuk).toISOString().slice(0, 10);
+      const jamMasuk = new Date(p.jam_masuk + 7 * 60 * 60 * 1000);
+      const tanggal = jamMasuk.toISOString().slice(0, 10);
       if (!tanggalSet.has(tanggal)) return;
 
       if (!rekap[opd][tanggal]) {
@@ -878,6 +948,7 @@ router.get("/rekap", async (req, res) => {
       detail[opd].izin.push({ ...i, tanggal });
     });
 
+    // Tanpa keterangan
     pegawaiList.forEach((p) => {
       const opd = p.nama_opd || "Tidak Diketahui";
       tanggalSet.forEach((tgl) => {
@@ -899,6 +970,7 @@ router.get("/rekap", async (req, res) => {
       });
     });
 
+    // Hitung persentase per pegawai
     Object.keys(detail).forEach((opd) => {
       const pegawaiById = {};
       ["biasa", "khusus", "izin", "tanpa_keterangan"].forEach((jenis) => {
@@ -937,6 +1009,7 @@ router.get("/rekap", async (req, res) => {
       detail[opd]._summary = Object.values(pegawaiById);
     });
 
+    // Urutkan tanggal
     Object.keys(rekap).forEach((opd) => {
       const sorted = Object.keys(rekap[opd])
         .sort()
@@ -955,11 +1028,9 @@ router.get("/rekap", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({
-      code: 500,
-      message: "Error",
-      error: err.message,
-    });
+    return res
+      .status(500)
+      .json({ code: 500, message: "Error", error: err.message });
   }
 });
 
