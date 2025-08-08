@@ -75,6 +75,10 @@ module.exports = (Sequelize, Datatypes) => {
             type: Datatypes.STRING,
             allowNull: true
         },
+        nama_opd: {
+            type: Datatypes.STRING,
+            allowNull: true
+        },
         id_jabatan: {
             type: Datatypes.STRING,
             allowNull: true
@@ -86,7 +90,7 @@ module.exports = (Sequelize, Datatypes) => {
         no_whatsapp: {
             type: Datatypes.STRING,
             allowNull: true
-        }
+        },
 
     }, {
         tableName: 'presensi',
