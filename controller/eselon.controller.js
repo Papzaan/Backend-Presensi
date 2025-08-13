@@ -10,7 +10,7 @@ const db = require("../models");
 const getEselonList = async (req, res) => {
   try {
     const query = `
-      SELECT 
+    SELECT 
     pr.*, pg.nama_pegawai, pg.id_opd, pg.no_whatsapp, j.id_jabatan, j.eselon,  
     o.id_opd, o.nama_opd
     FROM jabatan j
@@ -66,19 +66,25 @@ const getEselonByOpd = async (req, res) => {
 
   try {
     const query = `
-      SELECT 
+    SELECT 
+        pr.*,
         pg.id_pegawai,
         pg.nama_pegawai,
+        pg.no_whatsapp,
         pg.id_opd,
         o.nama_opd,
-        pg.no_whatsapp,
         j.id_jabatan,
         j.eselon
-      FROM jabatan j
-      JOIN pegawai pg ON pg.id_jabatan = j.id_jabatan
-      JOIN opd o ON o.id_opd = pg.id_opd
-      WHERE j.eselon IN ('2', '3')
-        AND pg.id_opd = :id_opd
+      FROM presensi pr
+      JOIN pegawai pg 
+        ON pr.id_pegawai = pg.id_pegawai
+      JOIN jabatan j 
+        ON pg.id_jabatan = j.id_jabatan
+      JOIN opd o 
+        ON o.id_opd = pg.id_opd
+      WHERE pg.id_opd = :id_opd
+        AND j.eselon IN ('2', '3')
+        AND DATE(STR_TO_DATE(pr.created_at, '%d/%m/%Y %H.%i.%s')) = CURDATE();
     `;
 
     const results = await db.sequelize.query(query, {
@@ -97,3 +103,19 @@ const getEselonByOpd = async (req, res) => {
 module.exports = {
   getEselonList,  getEselonByOpd,
 };
+
+
+
+// SELECT 
+//         pg.id_pegawai,
+//         pg.nama_pegawai,
+//         pg.id_opd,
+//         o.nama_opd,
+//         pg.no_whatsapp,
+//         j.id_jabatan,
+//         j.eselon
+//       FROM jabatan j
+//       JOIN pegawai pg ON pg.id_jabatan = j.id_jabatan
+//       JOIN opd o ON o.id_opd = pg.id_opd
+//       WHERE j.eselon IN ('2', '3')
+//         AND pg.id_opd = :id_opd
